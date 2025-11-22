@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException 
+from fastapi import FastAPI, HTTPException, Query 
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -61,9 +61,28 @@ def root():
 
 
 @app.get("/tasks", response_model=list[Task])
-def get_all_tasks():
-    """Retrieve all tasks"""
-    return tasks
+def get_all_tasks(
+    completed: Optional[bool] = None,
+    search: Optional[str] = None,
+    limit: int = Query(default=100, ge=1, le=100)
+):
+
+    """Retrieve all tasks with optional filtering"""
+    result = tasks
+
+    # Filter by completion status
+    if completed is not None:
+        result = [t for t in result if t["completed"] == completed]
+
+    # Filter by title search
+    # Convert search to lower, if search is in title or in description, return the result
+    if search:
+        search_lower = search.lower()
+        result = [t for t in result if search_lower in t["title"].lower()
+                  or (t["description"] and search_lower in t["description"].lower())]
+
+    # Apply limit
+    return result[:limit]
 
 
 @app.get("/tasks/{task_id}", response_model=Task)
