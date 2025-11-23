@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query 
-from typing import Optional
+from typing import Optional, Literal
 
 from models import Task, TaskCreate, TaskUpdate
 import database as db
@@ -15,7 +15,9 @@ router = APIRouter(
 @router.get("", response_model=list[Task])
 def get_all_tasks(
     completed: Optional[bool] = None,
+    priority: Optional[Literal["low", "medium", "high"]] = None,
     search: Optional[str] = None,
+    sort_by: Optional[Literal["id", "title", "priority", "completed"]] = None,
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=100)
 ):
@@ -27,12 +29,23 @@ def get_all_tasks(
     if completed is not None:
         result = [t for t in result if t["completed"] == completed]
 
+    if priority is not None:
+        result = [t for t in result if t["priority"] == priority]
+
     # Filter by title search
-    # Convert search to lower, if search is in title or in description, return the result
     if search:
         search_lower = search.lower()
         result = [t for t in result if search_lower in t["title"].lower()
                   or (t["description"] and search_lower in t["description"].lower())]
+
+    if sort_by:
+        if sort_by == "priority":
+            # Custom sort order: high > medium > low
+            priority_order = {"high": 0, "medium": 1, "low": 2}
+            result = sorted(result, key=lambda t: priority_order[t["priority"]])
+        else:
+            # For other fields, sort directly
+            result = sorted(result, key=lambda t: t[sort_by])
 
     # Apply limit
     return result[skip:skip + limit]
@@ -55,7 +68,8 @@ def create_task(task_data: TaskCreate):
         "id": db.task_id_counter,
         "title": task_data.title,
         "description": task_data.description,
-        "completed": False
+        "completed": False,
+        "priority": task_data.priority
     }
     db.tasks.append(task)
     return task
@@ -69,19 +83,15 @@ def update_task(task_id: int, task_data: TaskUpdate):
 
     # Check if any fields were provided
     update_data = task_data.model_dump(exclude_unset=True)
+
     if not update_data:
         raise HTTPException(
             status_code=400,
             detail="No fields provided for update"
         )
 
-    # Apply updates
-    if task_data.title is not None:
-        task["title"] = task_data.title
-    if task_data.description is not None:
-        task["description"] = task_data.description
-    if task_data.completed is not None:
-        task["completed"] = task_data.completed
+    # Update data with provided fields
+    task.update(update_data)
 
     return task
     
