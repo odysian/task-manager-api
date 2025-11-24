@@ -39,3 +39,12 @@ class Task(BaseModel):
     created_at: datetime
     due_date: Optional[date] = None
     tags: list[str]
+
+class TaskStats(BaseModel):
+    """Schema for task statistics"""
+    total: int
+    completed: int
+    incomplete: int
+    by_priority: dict[str, int]
+    by_tag: dict[str, int]
+    overdue: int

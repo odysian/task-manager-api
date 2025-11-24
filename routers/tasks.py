@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, Query 
 from typing import Optional, Literal
 from datetime import datetime, date
+from collections import Counter
 
-from models import Task, TaskCreate, TaskUpdate
+from models import Task, TaskCreate, TaskUpdate, TaskStats
 import database as db
 
 router = APIRouter(
@@ -87,6 +88,43 @@ def get_all_tasks(
 
     # Apply limit
     return result[skip:skip + limit]
+
+
+@router.get("/stats", response_model=TaskStats)
+def get_task_stats():
+    """Get statistics about all tasks"""
+
+    total = len(db.tasks)
+    completed = sum(1 for t in db.tasks if t["completed"])
+    incomplete = total - completed
+
+    # Count by priority
+    by_priority = Counter(t["priority"] for t in db.tasks)
+
+    # Count by tag (each tag counted seperately)
+    all_tags = []
+    for task in db.tasks:
+        all_tags.extend(task["tags"])
+    by_tag = Counter(all_tags)
+
+    # Count overdue tasks
+    today = date.today()
+    overdue = sum(1 for t in db.tasks
+                  if t["due_date"]
+                  and not t["completed"]
+                  and t["due_date"] < today)
+    
+    return {
+        "total": total,
+        "completed": completed,
+        "incomplete": incomplete,
+        "by_priority": by_priority,
+        "by_tag": by_tag,
+        "overdue": overdue
+    }
+
+
+
 
 
 @router.get("/{task_id}", response_model=Task)
