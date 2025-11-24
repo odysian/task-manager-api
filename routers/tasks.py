@@ -17,6 +17,7 @@ router = APIRouter(
 def get_all_tasks(
     completed: Optional[bool] = None,
     priority: Optional[Literal["low", "medium", "high"]] = None,
+    tag: Optional[str] = None,
     overdue: Optional[bool] = None,
     search: Optional[str] = None,
     created_after: Optional[date] = None,
@@ -36,6 +37,10 @@ def get_all_tasks(
 
     if priority is not None:
         result = [t for t in result if t["priority"] == priority]
+
+    # Tag filtering
+    if tag:
+        result = [t for t in result if tag in t["tags"]]
 
     if overdue is not None:
         today = date.today()
@@ -104,7 +109,8 @@ def create_task(task_data: TaskCreate):
         "completed": False,
         "priority": task_data.priority,
         "created_at": datetime.now(),
-        "due_date": task_data.due_date
+        "due_date": task_data.due_date,
+        "tags": task_data.tags
     }
     db.tasks.append(task)
     return task
@@ -138,3 +144,30 @@ def delete_task_id(task_id: int):
 
     task = db.get_task_by_id(task_id)
     db.tasks.remove(task)
+
+@router.post("/{task_id}/tags", response_model=Task)
+def add_tags(task_id: int, tags: list[str]):
+    """Add tags to a task without removing existing tags"""
+    task = db.get_task_by_id(task_id)
+
+    # Add new tags, avoiding duplicates
+    for tag in tags:
+        if tag not in task["tags"]:
+            task["tags"].append(tag)
+
+    return task
+
+
+@router.delete("/{task_id}/tags/{tag}", response_model=Task)
+def remove_tag(task_id: int, tag: str):
+    """Remove a specific tag from a task"""
+    task = db.get_task_by_id(task_id)
+
+    if tag in task["tags"]:
+        task["tags"].remove(tag)
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Tag '{tag}' not found on this task"
+        )
+    return task

@@ -10,6 +10,9 @@ class TaskCreate(BaseModel):
     description: Optional[str] = Field(default=None, max_length=1000)
     priority: Literal["low", "medium", "high"] = "medium"
     due_date: Optional[date] = None
+    tags: list[str] = Field(default_factory=list)
+    # Field(default_factory=list) means "if no tags provided, use an empty list []"
+    # You can't use = [] directly because that causes Python issues with mutable defaults.
 
     # Clean up leading/trailing whitespace
     class Config:
@@ -23,6 +26,7 @@ class TaskUpdate(BaseModel):
     completed: Optional[bool] = None
     priority: Optional[Literal["low", "medium", "high"]] = None
     due_date: Optional[date] = None
+    tags: Optional[list[str]] = None
 
 
 class Task(BaseModel):
@@ -34,3 +38,4 @@ class Task(BaseModel):
     priority: Literal["low", "medium", "high"]
     created_at: datetime
     due_date: Optional[date] = None
+    tags: list[str]

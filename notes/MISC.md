@@ -35,3 +35,39 @@ For a small list like ours, the performance difference is negligible. But the ha
 Clarity of intent: pop(i) says "I know exactly what I'm removing"
 Efficiency at scale: With 10,000 tasks, remove() does unnecessary work
 Avoiding surprises: What if two tasks somehow had identical content? remove() would only delete the first one it finds (which might not be the one you iterated to)
+
+## List Comprehension
+```py
+[WHAT_TO_KEEP for ITEM in LIST if CONDITION]
+
+[t                           # What to keep: the whole task
+ for t in result             # Loop through each task in result
+ if t["due_date"] is not None   # Condition 1: has a due date
+ and not t["completed"]          # AND Condition 2: not completed
+ and t["due_date"] < today]      # AND Condition 3: date is past
+
+# Regular loop
+if overdue:
+    filtered = []
+    today = date.today()
+    
+    for task in result:
+        if task["due_date"] and not task["completed"] and task["due_date"] < today:
+            filtered.append(task)
+    
+    result = filtered
+```
+
+## Sorting Lambda
+
+```py
+sorted(result, key=lambda t: t["due_date"] if t["due_date"] else date.max)
+
+# Expanded version
+def get_sort_key(t):
+    if t["due_date"]:
+        return t["due_date"]
+    else:
+        return date.max
+
+result = sorted(result, key=get_sort_key)
