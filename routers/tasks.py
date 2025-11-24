@@ -115,10 +115,10 @@ def get_task_stats(db_session: Session = Depends(get_db)):
 
     # Count overdue tasks
     today = date.today()
-    overdue = sum( # stubbon warnings, code works, just ignore
+    overdue = sum( 
         1 for t in all_tasks 
-        if t.due_date is not None
-        and not t.completed
+        if t.due_date is not None # type: ignore[arg-type]
+        and not t.completed # type: ignore[arg-type]
         and t.due_date < today
     )
     

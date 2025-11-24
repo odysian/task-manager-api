@@ -13,3 +13,4 @@ class Task(Base):
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     due_date = Column(Date, nullable=True)
     tags = Column(ARRAY(String), default=list, nullable=False)
+    notes = Column(String(500), nullable=True)
