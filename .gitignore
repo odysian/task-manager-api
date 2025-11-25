@@ -1,3 +1,6 @@
 venv/
 __pycache__/
 notes/SQL.md
+notes/02-context.md
+.env
+*.pyc

@@ -4,7 +4,7 @@ A learning project building a REST API with FastAPI and PostgreSQL. This tracks 
 
 ## What I've Learned
 
-**Week 1: FastAPI Fundamentals**
+**Phase 1: FastAPI Fundamentals**
 - Building APIs with FastAPI
 - Data validation with Pydantic
 - REST principles (CRUD operations, proper HTTP methods/status codes)
@@ -12,7 +12,7 @@ A learning project building a REST API with FastAPI and PostgreSQL. This tracks 
 - Working with dates and timestamps in Python
 - Code organization (separating models, routes, database logic)
 
-**Week 2: Database & Persistence**
+**Phase 2: Database & Persistence**
 - PostgreSQL installation and configuration
 - SQL fundamentals (DDL and DML)
 - SQLAlchemy ORM (models, sessions, queries)
@@ -145,7 +145,7 @@ alembic current
 
 ## What I'm Working On Next
 
-**Week 5-6: Authentication & Authorization**
+**Authentication & Authorization**
 - User registration and login
 - JWT token authentication
 - Password hashing with bcrypt
