@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, HTTPException, Query, Depends, status
+from fastapi import APIRouter, HTTPException, Query, Depends, status, BackgroundTasks
 from typing import Optional, Literal
 from datetime import datetime, date
 from collections import Counter
@@ -9,6 +9,7 @@ from db_config import get_db
 import db_models
 import exceptions
 from dependencies import get_current_user
+from background_tasks import send_task_completion_notification, cleanup_after_task_deletion
 
 router = APIRouter(
     prefix="/tasks",
@@ -254,6 +255,7 @@ def create_task(
 def update_task(
     task_id: int,
     task_data: TaskUpdate,
+    background_tasks: BackgroundTasks,
     db_session: Session = Depends(get_db),
     current_user: db_models.User = Depends(get_current_user)
 ):
@@ -281,12 +283,27 @@ def update_task(
     if not update_data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields provided for update")
 
+
+    # Check if task is being marked as complete for first time
+    was_incomplete = not task.completed # type: ignore
+    is_being_marked_complete = update_data.get("completed") is True
+
     # Update the task
     for field, value in update_data.items():
         setattr(task, field, value)
 
     db_session.commit()
     db_session.refresh(task)
+
+    # Only send notification when task transitions from incomplete -> complete
+    if was_incomplete and is_being_marked_complete:
+        logger.info(f"Task completed, scheduling notification: task_id={task_id}")
+        background_tasks.add_task(
+            send_task_completion_notification,
+            user_email=current_user.email, # type: ignore
+            task_title=task.title, # type: ignore
+            task_id=task.id # type: ignore
+        )
 
     logger.info(f"Task updates successfully: task_id={task_id}, user_id={current_user.id}")
 
@@ -297,6 +314,7 @@ def update_task(
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_task_id(
     task_id: int,
+    background_tasks: BackgroundTasks,
     db_session: Session = Depends(get_db),
     current_user: db_models.User = Depends(get_current_user)    
 ):
@@ -318,9 +336,16 @@ def delete_task_id(
             user_id=current_user.id # type: ignore
         )
 
+    task_title = task.title
+
     db_session.delete(task)
     db_session.commit()
 
+    background_tasks.add_task(
+        cleanup_after_task_deletion,
+        task_id=task.id, # type: ignore
+        task_title=task.title # type: ignore
+    )
     logger.info(f"Task deleted successfully: task_id={task_id}, user_id={current_user.id}")
 
     return None

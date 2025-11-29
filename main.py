@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 import exceptions
 from logging_config import setup_logging
-from routers import tasks, auth
+from routers import tasks, auth, files
 
 # cd task-manager-api
 # source venv/bin/activate
@@ -47,6 +47,7 @@ def root():
 
 app.include_router(tasks.router)
 app.include_router(auth.router)
+app.include_router(files.router)
 
 
 # --- Exception Handlers ---
@@ -116,3 +117,4 @@ async def invalid_credentials_handler(request: Request, exc: exceptions.InvalidC
         },
         headers={"WWW-Authenticate": "Bearer"}
     )
+

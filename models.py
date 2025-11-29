@@ -79,3 +79,24 @@ class UserLogin(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+class FileUploadResponse(BaseModel):
+    id: int
+    task_id: int
+    original_filename: str
+    file_size: int
+    content_type: str | None
+    uploaded_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class TaskFileInfo(BaseModel):
+    id: int
+    original_filename: str
+    file_size: int
+    content_type: str | None
+    uploaded_at: datetime
+
+    class Config:
+        from_attributes = True

@@ -6,4 +6,5 @@ notes/02-context.md
 *.pyc
 scratch.md
 logs/
-*.log
+*.loguploads/
+uploads/
