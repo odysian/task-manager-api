@@ -4,12 +4,15 @@ from typing import Optional, Literal
 from datetime import datetime, date
 from collections import Counter
 from sqlalchemy.orm import Session
+import json
+import time
 from models import Task, TaskCreate, TaskUpdate, TaskStats, BulkTaskUpdate
 from db_config import get_db
 import db_models
 import exceptions
 from dependencies import get_current_user
 from background_tasks import send_task_completion_notification, cleanup_after_task_deletion
+from redis_config import get_cache, set_cache, invalidate_user_cache
 
 router = APIRouter(
     prefix="/tasks",
@@ -108,8 +111,22 @@ def get_task_stats(
     db_session: Session = Depends(get_db),
     current_user: db_models.User = Depends(get_current_user)
 ):
-    """Get statistics about all tasks"""
+    """Get statistics about all tasks with Redis caching"""
+    start_time = time.time()
     logger.info(f"Retrieving task statistics for user_id={current_user.id}")
+
+    cache_key = f"stats:user_{current_user.id}"
+    cached_stats = get_cache(cache_key)
+
+    if cached_stats:
+        # Cache hit - Return cached data
+        stats_dict = json.loads(cached_stats)
+        elapsed_time = (time.time() - start_time) * 1000
+        logger.info(f"Returning cached statistics for user_id={current_user.id} | Time: {elapsed_time:.2f}ms")
+        return stats_dict
+    
+    # Cache miss - calculate stats from database
+    logger.info(f"Calculating fresh statistics for user_id={current_user.id}")
 
     all_tasks: list[db_models.Task] = db_session.query(db_models.Task).filter(
         db_models.Task.user_id == current_user.id
@@ -140,7 +157,7 @@ def get_task_stats(
     
     logger.info(f"Successfully retrieved task statistics for user_id={current_user.id}")
 
-    return {
+    stats_dict = {
         "total": total,
         "completed": completed,
         "incomplete": incomplete,
@@ -148,6 +165,14 @@ def get_task_stats(
         "by_tag": dict(by_tag),
         "overdue": overdue
     }
+
+    # Store in cache for next time
+    set_cache(cache_key, json.dumps(stats_dict))
+
+    elapsed_time = (time.time() - start_time) * 1000
+    logger.info(f"Successfully calculated and cached statistics for user_id={current_user.id} | Time: {elapsed_time:.2f}ms")
+
+    return stats_dict
 
 
 @router.patch("/bulk", response_model=list[Task])
@@ -189,6 +214,9 @@ def bulk_update_tasks(
     db_session.commit()
 
     logger.info(f"Bulk update completed: {len(tasks)} tasks updated for user_id={current_user.id}")
+
+    # Invalidate stats cache since task count changed
+    invalidate_user_cache(current_user.id) # type: ignore
 
     for task in tasks: db_session.refresh(task)
     
@@ -247,6 +275,9 @@ def create_task(
     db_session.refresh(new_task)
 
     logger.info(f"Task created successfully: task_id={new_task.id}, user_id={current_user.id}")
+
+    # Invalidate stats cache since task count changed
+    invalidate_user_cache(current_user.id) # type: ignore
 
     return new_task
 
@@ -307,6 +338,9 @@ def update_task(
 
     logger.info(f"Task updates successfully: task_id={task_id}, user_id={current_user.id}")
 
+    # Invalidate stats cache since task count changed
+    invalidate_user_cache(current_user.id) # type: ignore
+
     return task
     
 
@@ -353,6 +387,9 @@ def delete_task_id(
 
     )
     logger.info(f"Task deleted successfully: task_id={task_id}, user_id={current_user.id}")
+
+    # Invalidate stats cache since task count changed
+    invalidate_user_cache(current_user.id) # type: ignore
 
     return None
 
