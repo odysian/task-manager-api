@@ -36,6 +36,3 @@ notes/
 scratch.md
 *.md
 !README.md
-
-# Alembic (migrations run separately)
-alembic.ini

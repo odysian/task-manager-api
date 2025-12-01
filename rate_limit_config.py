@@ -30,6 +30,9 @@ def get_user_id_or_ip(request: Request) -> str:
 # Check if we're running tests
 TESTING = os.getenv("TESTING", "false").lower() == "true"
 
+# Get Redis URL from environment
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
 if TESTING:
     # Create a disabled limiter for tests
     limiter = Limiter(
@@ -42,8 +45,8 @@ else:
     limiter = Limiter(
         key_func=get_user_id_or_ip,
         default_limits=["1000/hour"], # Default limit for all endpoints
-        storage_uri="redis://localhost:6379",
+        storage_uri=REDIS_URL,
         strategy="fixed-window"
     )
-    logger.info("Rate limiting ENABLED")
+    logger.info("Rate limiting ENABLED with storage: {REDIS_URL}")
 

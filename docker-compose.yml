@@ -14,7 +14,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U task_user"]
+      test: ["CMD-SHELL", "pg_isready -U task_user -d task_manager"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -49,6 +49,10 @@ services:
       - UPLOAD_DIR=uploads
       - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED}
       - TESTING=false
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
     volumes:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
@@ -59,6 +63,7 @@ services:
         condition: service_healthy
     command: >
       sh -c "
+        cd /app &&
         alembic upgrade head &&
         uvicorn main:app --host 0.0.0.0 --port 8000 --reload
       "
