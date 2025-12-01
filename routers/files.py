@@ -2,8 +2,11 @@ import logging
 import os
 import uuid
 from pathlib import Path
+import boto3
+from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
+from io import BytesIO
 from sqlalchemy.orm import Session
 from db_config import get_db
 from dependencies import get_current_user
@@ -12,26 +15,38 @@ from models import FileUploadResponse, TaskFileInfo
 import exceptions
 from rate_limit_config import limiter
 
+# AWS S3 Configuration
+AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+
+# Create S3 Client
+s3_client = boto3.client(
+    's3',
+    region_name=AWS_REGION,
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY
+)
+
 # Router for task-related file endpoints
 task_files_router = APIRouter(prefix="/tasks", tags=["files"])
 
 # Router for direct file operations
 files_router = APIRouter(prefix="/files", tags=["files"])
 
+# File size limit (10 MB)
+MAX_FILE_SIZE = int(os.getenv("MAX_UPLOAD_SIZE", 10485760))
+
+# Allowed file types
+ALLOWED_EXTENSIONS_STR = os.getenv("ALLOWED_EXTENSIONS", ".jpg,.jpeg,.png,.gif,.pdf,.txt,.doc,.docx")
+ALLOWED_EXTENSIONS = set(ext.strip() for ext in ALLOWED_EXTENSIONS_STR.split(','))
+
 logger = logging.getLogger(__name__)
 
 # Upload directory
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
-
-# File size limit (10 MB)
-MAX_FILE_SIZE = 10 * 1024 * 1024
-
-# Allowed file types
-ALLOWED_EXTENSIONS = {
-    ".jpg", ".jpeg", ".png", ".gif", ".pdf", 
-    ".doc", ".docx", ".txt", ".zip"
-}
 
 @task_files_router.post("/{task_id}/files", response_model=FileUploadResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("20/hour") # 20 file uploads per hour
@@ -84,14 +99,24 @@ async def upload_file(
         )
 
 
-    # Generate unique filename
+    # Generate unique S3 key
     unique_id = str(uuid.uuid4())
     stored_filename = f"task_{task_id}_{unique_id}{file_ext}"
-    file_path = UPLOAD_DIR / stored_filename
     
-    # Save file to disk
-    with open(file_path, "wb") as f:
-        f.write(content)
+    # Upload to S3
+    try:
+        s3_client.put_object(
+            Bucket=S3_BUCKET_NAME,
+            Key=stored_filename,
+            Body=content,
+            ContentType=file.content_type or 'application/octet-stream'
+        )
+    except ClientError as e:
+        logger.error(f"S3 upload failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upload file to storage"
+        )
 
     logger.info(f"File saved to disk: {stored_filename} ({file_size} bytes)")
 
@@ -170,23 +195,40 @@ async def download_file(
             detail="You do not have permission to download this file"
         )
     
-    # Check if file exists on disk
-    file_path = UPLOAD_DIR / task_file.stored_filename  # type: ignore
-    if not file_path.exists():
-        logger.error(f"Download failed: file not found on disk: {task_file.stored_filename}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found on disk"
+    # Download file from S3
+    try:
+        s3_response = s3_client.get_object(
+            Bucket=S3_BUCKET_NAME,
+            Key=task_file.stored_filename
+        )
+        file_content = s3_response['Body'].read()
+
+        logger.info(f"File download successful: file_id={file_id}, filename={task_file.original_filename}")
+
+        # Wrap in BytesIO and stream to user
+        file_stream = BytesIO(file_content)
+
+        return StreamingResponse(
+            file_stream,
+            media_type=task_file.content_type or 'application/octet-stream', # type: ignore
+            headers={
+                "Content-Disposition": f"attachment; filename='{task_file.original_filename}'"
+            }
         )
     
-    logger.info(f"File download successful: file_id={file_id}, filename={task_file.original_filename}")
-
-    # Return the file for download
-    return FileResponse(
-        path=file_path, # type: ignore
-        filename=task_file.original_filename, # type: ignore
-        media_type=task_file.content_type # type: ignore
-    )
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'NoSuchKey':
+            logger.error(f"Download failed: file not found in S3: {task_file.stored_filename}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File not found in storage"
+            )
+        else:
+            logger.error(f"S3 download failed: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to download file from storage"
+            )
 
 @files_router.delete("/files/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_file(
@@ -224,13 +266,16 @@ def delete_file(
     db_session.delete(task_file)
     db_session.commit()
 
-    # Delete from disk
-    file_path = UPLOAD_DIR / stored_filename
-    if file_path.exists():
-        os.remove(file_path)
-        logger.info(f"File deleted from disk: {stored_filename}")
-    else:
-        logger.warning(f"File not found on disk during deletion: {stored_filename}")
+    # Delete from S3
+    try:
+        s3_client.delete_object(
+            Bucket=S3_BUCKET_NAME,
+            Key=stored_filename
+        )
+        logger.info(f"Deleted file from S3: {stored_filename}")
+    except ClientError as e:
+        # Log warning but don't fail - file might already be gone
+        logger.warning(f"S3 deletion warning for {stored_filename}: {e}")
 
     logger.info(f"File deleted successfully: file_id={file_id}, filename={original_filename}")
 

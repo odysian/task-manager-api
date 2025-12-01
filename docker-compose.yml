@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16
+    container_name: taskmanager-postgres
+    environment:
+      POSTGRES_USER: task_user
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_DB: task_manager
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U task_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: taskmanager-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Application
+  api:
+    build: .
+    container_name: taskmanager-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://task_user:dev_password@postgres:5432/task_manager
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - ALGORITHM=${ALGORITHM}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
+      - ENVIRONMENT=development
+      - MAX_UPLOAD_SIZE=${MAX_UPLOAD_SIZE}
+      - ALLOWED_EXTENSIONS=${ALLOWED_EXTENSIONS}
+      - UPLOAD_DIR=uploads
+      - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED}
+      - TESTING=false
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+      "
+
+volumes:
+  postgres_data:

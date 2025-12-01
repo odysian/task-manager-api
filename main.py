@@ -1,4 +1,9 @@
 import os
+from dotenv import load_dotenv
+
+# Load environment varaibles first
+load_dotenv()
+
 import logging
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse

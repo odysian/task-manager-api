@@ -1,9 +1,13 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Database connection URL
 # Format: postgresql://username:password@host:port/database
-DATABASE_URL = "postgresql://task_user:dev_password@localhost:5432/task_manager"
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://task_user:dev_password@localhost:5432/task_manager")
 
 # Create engine (handles connection pool)
 engine = create_engine(DATABASE_URL, echo=True)

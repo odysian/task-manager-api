@@ -1,13 +1,21 @@
+import os
 import redis
 import logging
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# Get Redis URL from environment (format: redis://host:port/db)
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+# Parse the Redis URL to extract host, port, and database number
+import urllib.parse
+parsed = urllib.parse.urlparse(REDIS_URL)
+
 # Redis connection settings
-REDIS_HOST = "localhost"
-REDIS_PORT = 6379
-REDIS_DB = 0
+REDIS_HOST = parsed.hostname or "localhost"
+REDIS_PORT = parsed.port or 6379
+REDIS_DB = int(parsed.path.lstrip('/')) if parsed.path else 0
 
 # Cache expiration times
 STATS_CACHE_TTL = 300
@@ -20,6 +28,9 @@ try:
         db=REDIS_DB,
         decode_responses=True # Automatically decode bytes to strings
     )
+    # Test connection
+    redis_client.ping()
+    logger.info(f"Redis connecetd: {REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}")
 except redis.ConnectionError as e:
     logger.error(f"Redis connection failed: {e}")
     redis_client = None

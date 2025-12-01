@@ -1,0 +1,41 @@
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+venv/
+env/
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.backup
+
+# Testing
+.pytest_cache
+
+# Logs and uploads (will be volumes in production)
+logs/
+uploads/
+
+# Documentation
+notes/
+scratch.md
+*.md
+!README.md
+
+# Alembic (migrations run separately)
+alembic.ini
