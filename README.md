@@ -243,12 +243,66 @@ task-manager-api/
 
 ## Current Status
 
-**Completed:**  Advanced Features
+**Completed:** Manual AWS Deployment (Phase 2)
 
-**Next Up:** Deployment
-- Docker containerization
-- CI/CD pipeline
-- Production deployment
+**Infrastructure:**
+- AWS EC2 (t3.micro) running Docker container
+- AWS RDS PostgreSQL for database
+- AWS ElastiCache Redis for caching
+- AWS S3 for file storage
+- Production environment fully functional
+
+**Next Up:** 
+- Terraform Infrastructure as Code
+- GitHub Actions CI/CD pipeline
+
+---
+## Deployment
+
+### Architecture
+```
+                             / RDS PostgreSQL
+Internet -> EC2 (Docker) -> { ElastiCache Redis  
+                             \ S3 (file storage)
+```
+
+**Production Infrastructure:**
+- **Region:** us-east-1
+- **VPC:** Default VPC (vpc-0b5d6c2c823eee5c4)
+- **EC2:** t3.micro Amazon Linux 2023
+- **RDS:** PostgreSQL 16 (db.t3.micro)
+- **ElastiCache:** Redis 7 (cache.t3.micro)
+- **S3:** task-manager-uploads-cjc3x3
+
+### Local Development with Docker
+```bash
+# Start all services (PostgreSQL, Redis, API)
+docker-compose up
+
+# Run in background
+docker-compose up -d
+
+# Stop all services
+docker-compose down
+
+# View logs
+docker-compose logs -f api
+```
+
+Access API at: http://localhost:8000/docs
+
+### Production Deployment
+
+Current deployment is manual (Phase 2). Terraform automation coming in Phase 3.
+
+**Production URL:** http://98.81.225.76:8000/docs
+
+**Manual Steps Summary:**
+1. Created security groups (EC2, RDS, ElastiCache)
+2. Launched RDS PostgreSQL instance
+3. Launched ElastiCache Redis cluster
+4. Launched EC2 instance with Docker
+5. Deployed application container with production environment variables
 
 ---
 
