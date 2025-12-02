@@ -8,17 +8,17 @@ output "redis_url" {
 }
 output "ec2_ip" {
   description = "IP address for EC2 instance"
-  value       = aws_instance.api.public_ip
+  value       = aws_eip.api.public_ip
 }
 output "api_url" {
   description = "URL to access the Task Manager API"
-  value       = "http://${aws_instance.api.public_ip}:8000"
+  value       = "http://${aws_eip.api.public_ip}:8000"
 }
 output "api_docs_url" {
   description = "API documentation"
-  value       = "http://${aws_instance.api.public_ip}:8000/docs"
+  value       = "http://${aws_eip.api.public_ip}:8000/docs"
 }
 output "ssh_command" {
   description = "SSH into EC2"
-  value       = "ssh -i ~/.ssh/${var.key_name}.pem ec2-user@${aws_instance.api.public_ip}"
+  value       = "ssh -i ~/.ssh/${var.key_name}.pem ec2-user@${aws_eip.api.public_ip}"
 }
