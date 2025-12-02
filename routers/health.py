@@ -1,3 +1,4 @@
+import os
 import logging
 from fastapi import APIRouter, Depends, status
 from sqlalchemy import text
@@ -25,4 +26,11 @@ def health_check(db_session: Session = Depends(get_db)):
     return {
         "status": "ok",
         "database": db_status
+    }
+
+@router.get("/version")
+def get_version():
+    return {
+        "version": "0.1.0",
+        "environment": os.getenv("ENVIRONMENT", "development")
     }
