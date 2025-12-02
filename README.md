@@ -243,18 +243,22 @@ task-manager-api/
 
 ## Current Status
 
-**Completed:** Manual AWS Deployment (Phase 2)
+**Completed:** Infrastructure as Code with Terraform (Phase 3)
 
 **Infrastructure:**
-- AWS EC2 (t3.micro) running Docker container
-- AWS RDS PostgreSQL for database
-- AWS ElastiCache Redis for caching
-- AWS S3 for file storage
-- Production environment fully functional
+- Fully automated AWS deployment with Terraform
+- 13 resources managed as code
+- IAM roles for secure S3 access
+- Automated bootstrap and migrations
+- Production environment accessible via Terraform outputs
 
 **Next Up:** 
-- Terraform Infrastructure as Code
-- GitHub Actions CI/CD pipeline
+- GitHub Actions CI/CD pipeline (Phase 4)
+  - Automated testing on pull requests
+  - Automated deployment on merge to main
+  - Infrastructure updates via Terraform
+
+---
 
 ---
 ## Deployment
@@ -262,7 +266,7 @@ task-manager-api/
 ### Architecture
 ```
                              / RDS PostgreSQL
-Internet -> EC2 (Docker) -> { ElastiCache Redis  
+Internet -> EC2 (Docker) -> │  ElastiCache Redis  
                              \ S3 (file storage)
 ```
 
@@ -291,18 +295,51 @@ docker-compose logs -f api
 
 Access API at: http://localhost:8000/docs
 
-### Production Deployment
+## Infrastructure as Code (Terraform)
 
-Current deployment is manual (Phase 2). Terraform automation coming in Phase 3.
+### What I Automated
 
-**Production URL:** http://98.81.225.76:8000/docs
+Replaced manual AWS setup with Terraform - **13 resources** deployed with one command.
 
-**Manual Steps Summary:**
-1. Created security groups (EC2, RDS, ElastiCache)
-2. Launched RDS PostgreSQL instance
-3. Launched ElastiCache Redis cluster
-4. Launched EC2 instance with Docker
-5. Deployed application container with production environment variables
+**Resources:**
+- 3 Security Groups (EC2, RDS, Redis) with proper isolation
+- RDS PostgreSQL 16.3 + ElastiCache Redis 7.0
+- EC2 with IAM role for S3 access (no hardcoded credentials)
+- Automated bootstrap via user data script
+
+**Key implementation details:**
+- **Bootstrap script**: Installs Docker, clones repo, waits for RDS, creates database idempotently, runs migrations
+- **IAM instance profile**: EC2 assumes role to access S3 (credentials never in code)
+- **Terraform templating**: User data script uses `templatefile()` to inject endpoints and secrets
+- **Resource dependencies**: `depends_on` ensures RDS/Redis exist before EC2 boots
+
+### Deployment
+```bash
+cd terraform
+terraform init
+terraform plan
+terraform apply  # ~10-15 minutes
+```
+
+### What Was New for Me
+
+**Docker entrypoint pattern:**
+- Migrations run automatically on container start via `entrypoint.sh`
+- Works consistently across local dev and production
+
+**Idempotent database creation:**
+```sql
+SELECT 'CREATE DATABASE task_manager' 
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'task_manager')\gexec
+```
+Safe to run multiple times for bootstrap scripts.
+
+**IAM roles for applications:**
+- Application uses boto3 with no credentials configured
+
+**User data debugging:**
+- All output logged to `/var/log/user-data.log`
+- Can SSH in and `tail -f` to watch bootstrap progress
 
 ---
 
