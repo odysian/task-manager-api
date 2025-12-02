@@ -259,8 +259,6 @@ task-manager-api/
   - Infrastructure updates via Terraform
 
 ---
-
----
 ## Deployment
 
 ### Architecture
