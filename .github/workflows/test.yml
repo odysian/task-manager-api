@@ -18,7 +18,7 @@ jobs:
         image: postgres:16
         env:
           POSTGRES_USER: task_user
-          POSTGRES_PASSWORD: test_password
+          POSTGRES_PASSWORD: dev_password
           POSTGRES_DB: task_manager_test
         options: >-
           --health-cmd pg_isready
@@ -59,7 +59,7 @@ jobs:
       # Step 4: Run tests
       - name: Run tests with pytest
         env:
-          DATABASE_URL: postgresql://task_user:test_password@localhost:5432/task_manager_test
+          DATABASE_URL: postgresql://task_user:dev_password@localhost:5432/task_manager_test
           SECRET_KEY: test-secret-key-for-ci-pipeline-only
           ALGORITHM: HS256
           ACCESS_TOKEN_EXPIRE_MINUTES: 60
