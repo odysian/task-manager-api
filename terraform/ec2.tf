@@ -79,3 +79,16 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   name = "${var.project_name}-ec2-profile"
   role = aws_iam_role.ec2_role.name
 }
+
+resource "aws_eip" "api" {
+  domain = "vpc"
+
+  tags = {
+    Name = "${var.project_name}-eip"
+  }
+}
+
+resource "aws_eip_association" "api" {
+  instance_id   = aws_instance.api.id
+  allocation_id = aws_eip.api.id
+}
