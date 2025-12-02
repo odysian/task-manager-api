@@ -19,7 +19,10 @@ import db_models
 # TEST DATABASE CONFIGURATION
 
 # Test database URL - points to task_manager_test instead of task_manager
-TEST_DATABASE_URL = "postgresql://task_user:dev_password@localhost/task_manager_test"
+TEST_DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://task_user:dev_password@localhost/task_manager_test"
+)
 
 # Create test engine
 test_engine = create_engine(
