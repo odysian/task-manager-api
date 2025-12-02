@@ -2,6 +2,7 @@ venv/
 __pycache__/
 notes/SQL.md
 notes/02-context.md
+notes/interview.md
 .env
 *.pyc
 scratch.md
