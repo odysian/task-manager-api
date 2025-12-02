@@ -14,7 +14,7 @@ resource "aws_elasticache_parameter_group" "redis" {
 resource "aws_elasticache_cluster" "redis" {
   cluster_id           = "${var.project_name}-elasticache-cluster"
   engine               = "redis"
-  engine_version       = "7.0.15"
+  engine_version       = "7.0"
   node_type            = "cache.t3.micro"
   port                 = 6379
   num_cache_nodes      = 1

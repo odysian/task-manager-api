@@ -21,7 +21,7 @@ resource "aws_instance" "api" {
   }))
 
   tags = {
-    Name = "${var.project_name}-taskmanager-ec2"
+    Name = "${var.project_name}-ec2"
   }
 
   # Wait fro RDS and Redis before launching EC2
@@ -35,7 +35,7 @@ resource "aws_instance" "api" {
 data "aws_iam_policy_document" "ec2_assume_role" {
   statement {
     effect  = "Allow"
-    actions = ["sts.AssumeRole"]
+    actions = ["sts:AssumeRole"]
 
     principals {
       type        = "Service"
