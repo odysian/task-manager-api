@@ -65,32 +65,35 @@ jobs:
           EC2_USER: ${{ secrets.EC2_USER }}
           IMAGE_TAG: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ github.sha }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
+          GITHUB_ACTOR: ${{ github.actor }}
         run: |
           echo "$EC2_SSH_KEY" > ec2_key.pem
           chmod 600 ec2_key.pem
           
+          # Pass environment variables to remote session
           ssh -i ec2_key.pem \
               -o StrictHostKeyChecking=no \
-              $EC2_USER@$EC2_HOST << 'ENDSSH'
+              $EC2_USER@$EC2_HOST \
+              "IMAGE_TAG='$IMAGE_TAG' GHCR_PAT='$GHCR_PAT' GITHUB_ACTOR='$GITHUB_ACTOR' bash -s" << 'ENDSSH'
             
             set -e
             
-            # Log in to GHCR
+            # Now all variables are available in the remote session
             echo "=== Logging in to GitHub Container Registry ==="
-            echo "$GHCR_PAT" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "$GHCR_PAT" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
             
             cd /home/ec2-user/task-manager-api
             
             # Pull the pre-built image
             echo "=== Pulling image: $IMAGE_TAG ==="
-            docker pull $IMAGE_TAG
+            docker pull "$IMAGE_TAG"
             
             # Run database migrations
             echo "=== Running migrations ==="
             docker run --rm \
               --env-file .env \
               --entrypoint "" \
-              $IMAGE_TAG \
+              "$IMAGE_TAG" \
               alembic upgrade head
             
             # Blue-Green Deployment
@@ -101,7 +104,7 @@ jobs:
               --name taskmanager-api-green \
               -p 8001:8000 \
               --env-file .env \
-              $IMAGE_TAG
+              "$IMAGE_TAG"
             
             # Health check Green container
             echo "=== Health checking Green container ==="
@@ -109,18 +112,18 @@ jobs:
             ATTEMPT=0
             GREEN_HEALTHY=false
             
-            while [ \$ATTEMPT -lt \$MAX_ATTEMPTS ]; do
+            while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
                 if curl -f http://localhost:8001/health > /dev/null 2>&1; then
                     echo "Green container is healthy!"
                     GREEN_HEALTHY=true
                     break
                 fi
-                ATTEMPT=\$((ATTEMPT + 1))
-                echo "Waiting for Green... (\$ATTEMPT/\$MAX_ATTEMPTS)"
+                ATTEMPT=$((ATTEMPT + 1))
+                echo "Waiting for Green... ($ATTEMPT/$MAX_ATTEMPTS)"
                 sleep 1
             done
             
-            if [ "\$GREEN_HEALTHY" = false ]; then
+            if [ "$GREEN_HEALTHY" = false ]; then
                 echo "Green container failed - rolling back"
                 docker logs taskmanager-api-green
                 docker stop taskmanager-api-green
@@ -141,7 +144,7 @@ jobs:
               -p 8000:8000 \
               --restart unless-stopped \
               --env-file .env \
-              $IMAGE_TAG
+              "$IMAGE_TAG"
             
             # Final health check
             echo "=== Final health check on production port ==="
@@ -151,7 +154,7 @@ jobs:
             echo "=== Deployment complete ==="
             docker ps | grep taskmanager-api
             
-            # Cleanup
+            # Cleanup old images
             docker image prune -f
           ENDSSH
           
