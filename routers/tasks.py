@@ -214,9 +214,8 @@ def bulk_update_tasks(
     # Query all tasks with the given IDs
 
     tasks = db_session.query(db_models.Task).filter(
-        db_models.Task.user_id == current_user.id,
         db_models.Task.id.in_(bulk_data.task_ids)
-    ).all() # type: ignore
+    ).all() 
 
     # Check if all IDs were found
     found_ids = {task.id for task in tasks}
@@ -228,6 +227,11 @@ def bulk_update_tasks(
         logger.warning(f"Bulk update: some tasks not found or unauthorized: missing_ids={missing_ids}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Tasks not found: {missing_ids}")
     
+    for task in tasks:
+        require_task_access(task, current_user, db_session, TaskPermission.EDIT)
+
+    logger.info(f"Bulk update authorized for user_id{current_user.id} on {len(tasks)} tasks")
+
     # Update each task
     for task in tasks:
         for field, value in update_data.items():
@@ -318,7 +322,7 @@ def update_task(
         logger.warning(f"Task not found: task_id={task_id}")
         raise exceptions.TaskNotFoundError(task_id=task_id)
 
-    require_task_access(task, current_user, db_session, TaskPermission.VIEW)
+    require_task_access(task, current_user, db_session, TaskPermission.EDIT)
     
     # Get only the fields that were provided
     update_data = task_data.model_dump(exclude_unset=True)
@@ -356,7 +360,6 @@ def update_task(
     return task
     
 
-
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_task_id(
     task_id: int,
@@ -374,7 +377,7 @@ def delete_task_id(
         logger.warning(f"Delete failed: task_id={task_id} not found")
         raise exceptions.TaskNotFoundError(task_id=task_id)
 
-    require_task_access(task, current_user, db_session, TaskPermission.VIEW)
+    require_task_access(task, current_user, db_session, TaskPermission.OWNER)
 
     # Save task info before deletion
     task_title: str = task.title # type: ignore
@@ -416,13 +419,7 @@ def add_tags(
         logger.warning(f"Task not found: task_id={task_id}")
         raise exceptions.TaskNotFoundError(task_id=task_id)
     
-    # Check if task belongs to current user
-    if task.user_id != current_user.id: # type: ignore
-        logger.warning(f"Unauthorized access attempt: user_id={current_user.id} tried to access task_id={task_id} owned by user_id={task.user_id}")
-        raise exceptions.UnauthorizedTaskAccessError(
-            task_id=task_id,
-            user_id=current_user.id # type: ignore
-        )
+    require_task_access(task, current_user, db_session, TaskPermission.EDIT)
 
     # Add new tags, avoiding duplicates
     for tag in tags:
@@ -456,13 +453,7 @@ def remove_tag(
         logger.warning(f"Task not found: task_id={task_id}")
         raise exceptions.TaskNotFoundError(task_id=task_id)
 
-    # Check if task belongs to current user
-    if task.user_id != current_user.id: # type: ignore
-        logger.warning(f"Unauthorized access attempt: user_id={current_user.id} tried to access task_id={task_id} owned by user_id={task.user_id}")
-        raise exceptions.UnauthorizedTaskAccessError(
-            task_id=task_id,
-            user_id=current_user.id # type: ignore
-        )
+    require_task_access(task, current_user, db_session, TaskPermission.EDIT)
 
     if tag not in task.tags:
         logger.warning(f"Tag not found: {tag} in task_id={task_id}")

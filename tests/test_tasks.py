@@ -635,14 +635,36 @@ def test_bulk_update_with_invalid_id_fails(client, create_user_and_token):
     )
     
     # ASSERT - Should fail because one task doesn't belong to User A
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.status_code == status.HTTP_403_FORBIDDEN
     
+
+
     # Verify NO tasks were updated (all-or-nothing)
     for task_id in user_a_task_ids:
         task = client.get(f"/tasks/{task_id}",
             headers={"Authorization": f"Bearer {user_a_token}"}
         ).json()
         assert task["completed"] == False  # Still incomplete
+
+    # --- SCENARIO 2: Non-Existent ID (404) ---
+    # User A treis to update a fake ID
+    fake_id = 99999
+    bulk_update_404 = {
+        "task_ids": user_a_task_ids + [fake_id],
+        "updates": {"completed": True}
+    }
+
+    response_404 = client.patch("/tasks/bulk",
+        json=bulk_update_404,
+        headers={"Authorization": f"Bearer {user_a_token}"}
+    )
+    
+    # print("\nDEBUG RESPONSE:", response_404.json())
+
+    assert response_404.status_code == status.HTTP_404_NOT_FOUND
+    assert str(fake_id) in response_404.json()["detail"]
+
+    
 
 def test_bulk_update_empty_list(authenticated_client):
     """Test bulk update with empty task list returns validation error"""

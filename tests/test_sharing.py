@@ -157,12 +157,47 @@ def test_unshare_task(client, create_user_and_token):
     )
 
     data = share_response.json()
-
     user_b_id = data["shared_with_user_id"]
-
     response = client.delete(
         f"/tasks/{task_id}/share/{user_b_id}",
         headers={"Authorization": f"Bearer {user_a_token}"}
     )
 
+    # ASSERT
     assert response.status_code == status.HTTP_204_NO_CONTENT
+
+def test_update_share_permission(client, create_user_and_token):
+    """Test that share permissions can be updated"""
+
+    # ARRANGE
+    user_a_token = create_user_and_token("usera", "usera@test.com", "password123")
+    user_b_token = create_user_and_token("userb", "userb@test.com", "password456")
+
+    response = client.post("/tasks",
+        json={"title": "User A task", "priority": "low"},
+        headers={"Authorization": f"Bearer {user_a_token}"}
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+    task_id = response.json()["id"]
+
+    share_response = client.post(
+        f"/tasks/{task_id}/share",
+        json={"shared_with_username": "userb", "permission": "view"},
+        headers={"Authorization": f"Bearer {user_a_token}"}
+    )
+
+    data = share_response.json()
+    user_b_id = data["shared_with_user_id"]
+
+    # ACT
+    update_response = client.put(
+        f"/tasks/{task_id}/share/{user_b_id}",
+        json={"permission": "edit"},
+        headers={"Authorization": f"Bearer {user_a_token}"}
+    )
+
+    # ASSERT
+    assert update_response.status_code == status.HTTP_200_OK
+    data = update_response.json()
+    assert data["permission"] == "edit"

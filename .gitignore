@@ -10,3 +10,4 @@ logs/
 *.loguploads/
 uploads/
 .env.docker
+.vscode/

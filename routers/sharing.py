@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from models import TaskShareCreate, TaskShareResponse, Task
+from models import TaskShareCreate, TaskShareResponse, Task, TaskShareUpdate
 from db_config import get_db
 from dependencies import get_current_user
 import db_models
@@ -71,7 +71,6 @@ def share_task(
     db_session.commit()
     db_session.refresh(share)
 
-    # Build response
     return {
         "id": share.id,
         "task_id": share.task_id,
@@ -137,5 +136,54 @@ def unshare_task(
     db_session.commit()
     
     return None
+
+@sharing_router.put("/{task_id}/share/{user_id}")
+def update_share_permission(
+    task_id: int,
+    user_id: int,
+    share_update: TaskShareUpdate,
+    db_session: Session = Depends(get_db),
+    current_user: db_models.User = Depends(get_current_user)
+):
+    """Update permission level"""
+
+    # Get the task
+    task = db_session.query(db_models.Task).filter(
+        db_models.Task.id == task_id
+    ).first()
+
+    if not task:
+        raise exceptions.TaskNotFoundError(task_id=task_id)
+    
+    # Only owner can unshare
+    if task.user_id != current_user.id: # type: ignore
+        raise exceptions.UnauthorizedTaskAccessError(task_id=task_id, user_id=current_user.id) # type: ignore
+    
+    # Find the share
+    share = db_session.query(db_models.TaskShare).filter(
+        db_models.TaskShare.task_id == task_id,
+        db_models.TaskShare.shared_with_user_id == user_id
+    ).first()
+
+    if not share:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task is not shared with this user"
+        )
+    
+    share.permission = share_update.permission # type: ignore
+    
+    # Delete the share
+    db_session.commit()
+    db_session.refresh(share)
+    
+    return {
+        "id": share.id,
+        "task_id": share.task_id,
+        "shared_with_user_id": share.shared_with_user_id,
+        "shared_with_username": share.shared_with.username, # <--- Grab it here
+        "permission": share.permission,
+        "shared_at": share.shared_at
+    }
 
     

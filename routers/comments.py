@@ -85,12 +85,14 @@ def update_comment(
         logger.warning(f"Comment not found: comment_id={comment_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
 
+    require_task_access(comment.task, current_user, db_session, TaskPermission.VIEW)
+
     # Check if task belongs to current user
     if comment.user_id != current_user.id: # type: ignore
         logger.warning(f"Unauthorized access attempt: user_id={current_user.id} tried to access comment_id={comment_id} owned by user_id={comment.user_id}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail= "User {current_user.id} is not authorized to access comment_id={comment_id}"
+            detail= f"User {current_user.id} is not authorized to access comment_id={comment_id}"
         )
     
     comment.content = comment_data.content # type: ignore
@@ -117,6 +119,8 @@ def delete_comment(
     if not comment:
         logger.warning(f"Comment not found: comment_id={comment_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+
+    require_task_access(comment.task, current_user, db_session, TaskPermission.VIEW)
 
     # Check if task belongs to current user
     if comment.user_id != current_user.id and comment.task.user_id != current_user.id: # type: ignore

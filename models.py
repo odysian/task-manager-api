@@ -147,3 +147,6 @@ class SharedTaskResponse(BaseModel):
     permission: str # Your permission level
     is_owner: bool # Are you the owner?
     
+class TaskShareUpdate(BaseModel):
+    """Request to update a share permission"""
+    permission: Literal["view", "edit"]

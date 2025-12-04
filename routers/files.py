@@ -14,6 +14,7 @@ import db_models
 from models import FileUploadResponse, TaskFileInfo
 import exceptions
 from rate_limit_config import limiter
+from dependencies import require_task_access, TaskPermission
 
 # AWS S3 Configuration
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
@@ -64,7 +65,7 @@ async def upload_file(
     """
     logger.info(f"File upload attempt for task_id={task_id} by user_id={current_user.id}: filename={file.filename}")
 
-    # Check if task exists and user owns it
+    # Check if task exists and verify access permissions
     task = db_session.query(db_models.Task).filter(
         db_models.Task.id == task_id
     ).first()
@@ -73,9 +74,7 @@ async def upload_file(
         logger.warning(f"Upload failed: task_id={task_id} not found")
         raise exceptions.TaskNotFoundError(task_id=task_id)
     
-    if task.user_id != current_user.id:  # type: ignore
-        logger.warning(f"Upload failed: user_id={current_user.id} tried to upload to task_id={task_id}")
-        raise exceptions.UnauthorizedTaskAccessError(task_id=task_id, user_id=current_user.id)  # type: ignore
+    require_task_access(task, current_user, db_session, TaskPermission.EDIT)
     
     # Validate file extension
     file_ext = Path(file.filename).suffix.lower() # type: ignore
@@ -146,7 +145,7 @@ def list_task_files(
     """List all files attached to a task"""
     logger.info(f"Listing files for task_id={task_id}, user_id={current_user.id}")
 
-    # Check if task exists and user owns it
+    # Check if task exists and verify access permissions
     task = db_session.query(db_models.Task).filter(
         db_models.Task.id == task_id
     ).first()
@@ -154,8 +153,7 @@ def list_task_files(
     if not task:
         raise exceptions.TaskNotFoundError(task_id=task_id)
     
-    if task.user_id != current_user.id:  # type: ignore
-        raise exceptions.UnauthorizedTaskAccessError(task_id=task_id, user_id=current_user.id)  # type: ignore
+    require_task_access(task, current_user, db_session, TaskPermission.VIEW)
     
     # Use the relationship
     files = task.files
@@ -170,7 +168,8 @@ async def download_file(
     db_session: Session = Depends(get_db),
     current_user: db_models.User = Depends(get_current_user)
 ):
-    """Download a file by its ID.
+    """
+    Download a file by its ID.
     Returns the actual file for download
     """
     logger.info(f"File download request: file_id={file_id}, user_id={current_user.id}")
@@ -186,14 +185,8 @@ async def download_file(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"File with ID {file_id} not found"
         )
-
-    # Check if user owns the task this file belongs to
-    if task_file.task.user_id != current_user.id:
-        logger.warning(f"Download failed: user_id={current_user.id} tried to download file_id={file_id}")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to download this file"
-        )
+    # Verify user has permission to access the parent task
+    require_task_access(task_file.task, current_user, db_session, TaskPermission.VIEW)
     
     # Download file from S3
     try:
@@ -250,13 +243,9 @@ def delete_file(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"File with ID {file_id} not found"
         )
-    # Check if user owns the task this file belongs to
-    if task_file.task.user_id != current_user.id:
-        logger.warning(f"Download failed: user_id={current_user.id} tried to download file_id={file_id}")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to download this file"
-        )
+    
+    # Verify user has permission to access the parent task
+    require_task_access(task_file.task, current_user, db_session, TaskPermission.EDIT)
     
     # Save filename before deleting from DB
     stored_filename: str = task_file.stored_filename # type: ignore
