@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, UniqueConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -19,12 +19,11 @@ class Task(Base):
     notes = Column(String(500), nullable=True) 
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    # One task has many file
+    # Relationships
     files = relationship("TaskFile", back_populates="task", cascade="all, delete-orphan")
     comments = relationship("TaskComment", back_populates="task", cascade="all, delete-orphan")
-
-    # Many tasks belong to one user
     owner = relationship("User", back_populates="tasks")
+    shares = relationship("TaskShare", back_populates="task", cascade="all, delete-orphan")
 
 class User(Base):
     __tablename__ = "users"
@@ -35,7 +34,7 @@ class User(Base):
     hashed_password = Column(String(100), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    # One user has many tasks
+    # Relationships
     tasks = relationship("Task", back_populates="owner")
 
 class TaskFile(Base):
@@ -48,7 +47,7 @@ class TaskFile(Base):
     content_type = Column(String(100))
     uploaded_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
-    # Each file belongs to one task
+    # Relationships
     task = relationship("Task", back_populates="files")
 
 class TaskComment(Base):
@@ -65,5 +64,25 @@ class TaskComment(Base):
     task = relationship("Task", back_populates="comments")
     author = relationship("User")
 
+class TaskShare(Base):
+    __tablename__ = "task_shares"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+    shared_with_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    permission = Column(String(20), nullable=False)
+    shared_at = Column(DateTime, server_default=func.now())
+    shared_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Relationships
+    task = relationship("Task", back_populates="shares")
+    shared_with = relationship("User", foreign_keys=[shared_with_user_id])
+    shared_by = relationship("User", foreign_keys=[shared_by_user_id])
+
+    # Unique constraint: Can't share same task with same user twice
+    __table_args__ = (
+        UniqueConstraint('task_id', 'shared_with_user_id', name='unique_task_share'),
+    )
+                     
     
 

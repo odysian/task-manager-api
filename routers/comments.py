@@ -5,7 +5,7 @@ from models import Comment, CommentCreate, CommentUpdate
 from db_config import get_db
 import db_models
 import exceptions
-from dependencies import get_current_user
+from dependencies import get_current_user, require_task_access, TaskPermission
 
 task_comments_router = APIRouter(prefix="/tasks", tags=["comments"])
 comments_router = APIRouter(prefix="/comments", tags=["comments"])
@@ -28,13 +28,7 @@ def add_comment(
         logger.warning(f"Task not found: task_id={task_id}")
         raise exceptions.TaskNotFoundError(task_id=task_id)
     
-    # Check if task belongs to current user
-    if task.user_id != current_user.id: # type: ignore
-        logger.warning(f"Unauthorized access attempt: user_id={current_user.id} tried to access task_id={task_id} owned by user_id={task.user_id}")
-        raise exceptions.UnauthorizedTaskAccessError(
-            task_id=task_id,
-            user_id=current_user.id # type: ignore
-        )
+    require_task_access(task, current_user, db_session, TaskPermission.VIEW)
     
     comment = db_models.TaskComment(
         task_id=task_id,
@@ -66,8 +60,7 @@ def get_comments(
     if not task:
         raise exceptions.TaskNotFoundError(task_id=task_id)
     
-    if task.user_id != current_user.id:  # type: ignore
-        raise exceptions.UnauthorizedTaskAccessError(task_id=task_id, user_id=current_user.id)  # type: ignore
+    require_task_access(task, current_user, db_session, TaskPermission.VIEW)
     
     comments = task.comments
     
@@ -115,7 +108,7 @@ def delete_comment(
     db_session: Session = Depends(get_db),
     current_user: db_models.User = Depends(get_current_user)
 ):
-    """Edit a comment"""
+    """Delete a comment"""
     logger.info(f"Deleting comment={comment_id} for user_id={current_user.id}")
 
     # Find the task
@@ -128,7 +121,7 @@ def delete_comment(
     # Check if task belongs to current user
     if comment.user_id != current_user.id and comment.task.user_id != current_user.id: # type: ignore
         logger.warning(f"Unauthorized access attempt: user_id={current_user.id} tried to access comment_id={comment_id} owned by user_id={comment.user_id}")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail= "User {current_user.id} is not authorized to access comment_id={comment_id}")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail= f"User {current_user.id} is not authorized to access comment_id={comment_id}")
 
     db_session.delete(comment)
     db_session.commit()

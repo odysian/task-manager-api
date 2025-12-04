@@ -10,7 +10,7 @@ from models import Task, TaskCreate, TaskUpdate, TaskStats, BulkTaskUpdate, Pagi
 from db_config import get_db
 import db_models
 import exceptions
-from dependencies import get_current_user
+from dependencies import get_current_user, require_task_access, TaskPermission
 from background_tasks import send_task_completion_notification, cleanup_after_task_deletion
 from redis_config import get_cache, set_cache, invalidate_user_cache
 from rate_limit_config import limiter
@@ -261,14 +261,8 @@ def get_task_id(
         logger.warning(f"Task not found: task_id={task_id}")
         raise exceptions.TaskNotFoundError(task_id=task_id) # Custom Exception
     
-    # Check if task belongs to current user
-    if task.user_id != current_user.id: # type: ignore
-        logger.warning(f"Unauthorized access attempt: user_id={current_user.id} tried to access task_id={task_id} owned by user_id={task.user_id}")
-        raise exceptions.UnauthorizedTaskAccessError(
-            task_id=task_id,
-            user_id=current_user.id # type: ignore
-        )
-    
+    require_task_access(task, current_user, db_session, TaskPermission.VIEW)
+
     logger.info(f"Task retrieved successfully: task_id={task_id}, user_id={current_user.id}")
     return task
 
@@ -324,13 +318,7 @@ def update_task(
         logger.warning(f"Task not found: task_id={task_id}")
         raise exceptions.TaskNotFoundError(task_id=task_id)
 
-    # Check if task belongs to current user
-    if task.user_id != current_user.id: # type: ignore
-        logger.warning(f"Unauthorized access attempt: user_id={current_user.id} tried to access task_id={task_id} owned by user_id={task.user_id}")
-        raise exceptions.UnauthorizedTaskAccessError(
-            task_id=task_id,
-            user_id=current_user.id # type: ignore
-        )
+    require_task_access(task, current_user, db_session, TaskPermission.VIEW)
     
     # Get only the fields that were provided
     update_data = task_data.model_dump(exclude_unset=True)
@@ -386,13 +374,7 @@ def delete_task_id(
         logger.warning(f"Delete failed: task_id={task_id} not found")
         raise exceptions.TaskNotFoundError(task_id=task_id)
 
-        # Check if task belongs to current user
-    if task.user_id != current_user.id: # type: ignore
-        logger.warning(f"Unauthorized delete attempt: user_id={current_user.id} tried to delete task_id={task_id}")
-        raise exceptions.UnauthorizedTaskAccessError(
-            task_id=task_id,
-            user_id=current_user.id # type: ignore
-        )
+    require_task_access(task, current_user, db_session, TaskPermission.VIEW)
 
     # Save task info before deletion
     task_title: str = task.title # type: ignore
