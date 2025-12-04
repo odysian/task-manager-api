@@ -53,11 +53,12 @@ def test_get_tasks_returns_only_user_tasks(authenticated_client):
 
     # ACT
     response = authenticated_client.get("/tasks")
+    data = response.json()
 
     # ASSERT
     assert response.status_code == status.HTTP_200_OK
 
-    tasks = response.json()
+    tasks = data['tasks']
     assert len(tasks) == 2
     assert tasks[0]["title"] == "My task 1"
     assert tasks[1]["title"] == "My task 2"
@@ -70,10 +71,12 @@ def test_get_tasks_empty_list(authenticated_client):
 
     # ACT
     response = authenticated_client.get("/tasks")
+    data = response.json()
+    tasks = data['tasks']
 
     # ASSERT
     assert response.status_code == status.HTTP_200_OK
-    assert response.json() == []
+    assert tasks == []
 
 
 def test_get_single_task_successfully(authenticated_client):
@@ -343,11 +346,13 @@ def test_filter_tasks_by_completed(authenticated_client):
     
     # ACT - Filter for completed tasks only
     response = authenticated_client.get("/tasks?completed=true")
+    data = response.json()
+
     
     # ASSERT
-    print(f"Filter response: {response.json()}")
+    print(f"Filter response: {data}")
     assert response.status_code == status.HTTP_200_OK
-    tasks = response.json()
+    tasks = data['tasks']
     assert len(tasks) == 1
 
 
@@ -361,10 +366,11 @@ def test_filter_tasks_by_priority(authenticated_client):
     
     # ACT
     response = authenticated_client.get("/tasks?priority=high")
+    data = response.json()
     
     # ASSERT
     assert response.status_code == status.HTTP_200_OK
-    tasks = response.json()
+    tasks = data['tasks']
     assert len(tasks) == 2
     assert all(task["priority"] == "high" for task in tasks)
 
@@ -386,10 +392,11 @@ def test_search_tasks_by_text(authenticated_client):
     
     # ACT - Search for "report"
     response = authenticated_client.get("/tasks?search=report")
+    data = response.json()
     
     # ASSERT
     assert response.status_code == status.HTTP_200_OK
-    tasks = response.json()
+    tasks = data['tasks']
     assert len(tasks) == 1
     assert "report" in tasks[0]["title"].lower() or "report" in tasks[0]["description"].lower()
 
@@ -427,15 +434,17 @@ def test_pagination(authenticated_client):
     
     # ASSERT
     assert response.status_code == status.HTTP_200_OK
-    tasks = response.json()
+    data = response.json()
+    tasks = data['tasks']
     assert len(tasks) == 2
     
     # ACT - Get next 2 tasks
     response = authenticated_client.get("/tasks?skip=2&limit=2")
+    data = response.json()
     
     # ASSERT
     assert response.status_code == status.HTTP_200_OK
-    tasks = response.json()
+    tasks = data['tasks']
     assert len(tasks) == 2
 
 
@@ -461,10 +470,11 @@ def test_combine_multiple_filters(authenticated_client):
     
     # ACT - Filter: high priority AND not completed
     response = authenticated_client.get("/tasks?priority=high&completed=false")
+    data = response.json()
     
     # ASSERT
     assert response.status_code == status.HTTP_200_OK
-    tasks = response.json()
+    tasks = data['tasks']
     assert len(tasks) == 1
     assert tasks[0]["title"] == "Important work"
 
