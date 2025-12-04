@@ -162,7 +162,7 @@ def list_task_files(
 
     return files
 
-@files_router.get("/files/{file_id}")
+@files_router.get("/{file_id}")
 async def download_file(
     file_id: int,
     db_session: Session = Depends(get_db),
@@ -223,7 +223,7 @@ async def download_file(
                 detail="Failed to download file from storage"
             )
 
-@files_router.delete("/files/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
+@files_router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_file(
     file_id: int,
     db_session: Session = Depends(get_db),
