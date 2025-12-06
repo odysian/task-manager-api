@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from models import TaskShareCreate, TaskShareResponse, Task, TaskShareUpdate
 from db_config import get_db
 from dependencies import get_current_user
 import db_models
 import exceptions
+from background_tasks import notify_task_shared
 
 sharing_router = APIRouter(prefix="/tasks", tags=["sharing"])
 
@@ -12,6 +13,7 @@ sharing_router = APIRouter(prefix="/tasks", tags=["sharing"])
 def share_task(
     task_id: int,
     share_data: TaskShareCreate,
+    background_tasks: BackgroundTasks,
     db_session: Session = Depends(get_db),
     current_user: db_models.User = Depends(get_current_user)
 ):
@@ -70,6 +72,16 @@ def share_task(
     db_session.add(share)
     db_session.commit()
     db_session.refresh(share)
+
+    # Trigger the background notification
+    background_tasks.add_task( 
+        notify_task_shared,
+        recipient_user_id=shared_with_user.id, # type: ignore
+        recipient_email=shared_with_user.email, # type: ignore
+        task_title=task.title, # type: ignore
+        sharer_username=current_user.username, # type: ignore
+        permission=share_data.permission
+    )
 
     return {
         "id": share.id,

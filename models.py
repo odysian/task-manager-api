@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Literal
 from datetime import datetime, date
 
-# --- Pydantic Models (Schemas) ---
+# --- Task Models ---
 
 class TaskCreate(BaseModel):
     """Schema for creating a new task"""
@@ -65,6 +65,8 @@ class BulkTaskUpdate(BaseModel):
     task_ids: list[int] = Field(min_length=1)   # Must provide at least one ID
     updates: TaskUpdate   # Reuse the existing TaskUpdate model
 
+# --- Auth Models ---
+
 class UserCreate(BaseModel):
     """Schema to create user"""
     username: str = Field(min_length=3, max_length=50)
@@ -88,6 +90,8 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+# --- File Models ---
+
 class FileUploadResponse(BaseModel):
     id: int
     task_id: int
@@ -108,6 +112,9 @@ class TaskFileInfo(BaseModel):
 
     class Config:
         from_attributes = True
+
+# --- Comment Models ---      
+
 class CommentCreate(BaseModel):
     content: str = Field(min_length=1, max_length=1000)
 
@@ -115,7 +122,7 @@ class CommentUpdate(BaseModel):
     content: str = Field(min_length=1, max_length=1000)
 
 class Comment(BaseModel):
-    """Schema for coment responses"""
+    """Schema for comment responses"""
     id: int
     task_id: int
     user_id: int
@@ -124,6 +131,8 @@ class Comment(BaseModel):
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+# --- Task Models ---
 
 class TaskShareCreate(BaseModel):
     """Request to share a task"""
@@ -150,3 +159,27 @@ class SharedTaskResponse(BaseModel):
 class TaskShareUpdate(BaseModel):
     """Request to update a share permission"""
     permission: Literal["view", "edit"]
+
+# --- Notification Models ---
+
+class NotificationPreferenceUpdate(BaseModel):
+    """Schema for updating preferences (all optional)"""
+    email_enabled: Optional[bool] = None
+    task_shared_with_me: Optional[bool] = None
+    task_completed: Optional[bool] = None
+    comment_on_my_task: Optional[bool] = None
+    task_due_soon: Optional[bool] = None
+
+class NotificationPreferenceResponse(BaseModel):
+    """Schema for reading preferences"""
+    user_id: int
+    email_verified: bool
+    email_enabled: bool
+    task_shared_with_me: bool
+    task_completed: bool
+    comment_on_my_task: bool
+    task_due_soon: bool
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+

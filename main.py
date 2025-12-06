@@ -1,17 +1,19 @@
 import os
+
 from dotenv import load_dotenv
 
 # Load environment varaibles first
 load_dotenv()
 
 import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
-from contextlib import asynccontextmanager
 
 import exceptions
 from logging_config import setup_logging
-from routers import tasks, auth, files, health, comments, sharing
+from routers import auth, comments, files, health, notifications, sharing, tasks
 
 # cd task-manager-api
 # source venv/bin/activate
@@ -32,9 +34,11 @@ TESTING = os.getenv("TESTING", "false").lower() == "true"
 if not TESTING:
     from slowapi import _rate_limit_exceeded_handler
     from slowapi.errors import RateLimitExceeded
+
     from rate_limit_config import limiter
 
 # --- Application Setup ---
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -43,6 +47,7 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
     logger.info("Task Manager API shutting down")
+
 
 # Define the order and details for your docs
 tags_metadata = [
@@ -66,6 +71,7 @@ tags_metadata = [
         "name": "files",
         "description": "File attachments and downloads.",
     },
+    {"name": "notifications", "description": "Send notifications with SNS."},
     {
         "name": "health",
         "description": "API health checks.",
@@ -77,7 +83,7 @@ app = FastAPI(
     description="A simple task management API",
     version="0.1.0",
     lifespan=lifespan,
-    openapi_tags=tags_metadata
+    openapi_tags=tags_metadata,
 )
 
 # Only add rate limiter if not testing
@@ -92,11 +98,14 @@ else:
 # Log application startup
 logger.info("Task Manager API starting up")
 
+
 @app.get("/")
 def root():
     """Health check / welcome endpoint"""
     return {"message": "Task Manager API", "status": "running"}
 
+
+app.include_router(notifications.router)
 app.include_router(sharing.sharing_router)
 app.include_router(tasks.router)
 app.include_router(auth.router)
@@ -107,8 +116,8 @@ app.include_router(comments.task_comments_router)
 app.include_router(comments.comments_router)
 
 
-
 # --- Exception Handlers ---
+
 
 @app.exception_handler(exceptions.TaskNotFoundError)
 async def task_not_found_handler(request: Request, exc: exceptions.TaskNotFoundError):
@@ -119,22 +128,28 @@ async def task_not_found_handler(request: Request, exc: exceptions.TaskNotFoundE
         content={
             "error": "Task Not Found",
             "message": exc.message,
-            "task_id": exc.task_id
-        }
+            "task_id": exc.task_id,
+        },
     )
 
+
 @app.exception_handler(exceptions.UnauthorizedTaskAccessError)
-async def unauthorized_task_handler(request: Request, exc: exceptions.UnauthorizedTaskAccessError):
+async def unauthorized_task_handler(
+    request: Request, exc: exceptions.UnauthorizedTaskAccessError
+):
     """Handle UnauthorizedTaskAccessError by returning 403"""
-    logger.warning(f"UnauthorizedTaskAccessError: {exc.message} (path: {request.url.path})")
+    logger.warning(
+        f"UnauthorizedTaskAccessError: {exc.message} (path: {request.url.path})"
+    )
     return JSONResponse(
         status_code=status.HTTP_403_FORBIDDEN,
         content={
             "error": "Unauthorized Access",
-            "message": "You do not have permission to access this task"
+            "message": "You do not have permission to access this task",
             # Don't expose task_id or user_id in response for security
-        }
+        },
     )
+
 
 @app.exception_handler(exceptions.TagNotFoundError)
 async def tag_not_found_handler(request: Request, exc: exceptions.TagNotFoundError):
@@ -146,9 +161,10 @@ async def tag_not_found_handler(request: Request, exc: exceptions.TagNotFoundErr
             "error": "Tag Not Found",
             "message": exc.message,
             "task_id": exc.task_id,
-            "tag": exc.tag
-        }
+            "tag": exc.tag,
+        },
     )
+
 
 @app.exception_handler(exceptions.DuplicateUserError)
 async def duplicate_user_handler(request: Request, exc: exceptions.DuplicateUserError):
@@ -156,23 +172,18 @@ async def duplicate_user_handler(request: Request, exc: exceptions.DuplicateUser
     logger.warning(f"DuplicateUserError: {exc.message} (path: {request.url.path})")
     return JSONResponse(
         status_code=status.HTTP_409_CONFLICT,
-        content={
-            "error": "Duplicate User",
-            "message": exc.message,
-            "field": exc.field
-        }
+        content={"error": "Duplicate User", "message": exc.message, "field": exc.field},
     )
 
+
 @app.exception_handler(exceptions.InvalidCredentialsError)
-async def invalid_credentials_handler(request: Request, exc: exceptions.InvalidCredentialsError):
+async def invalid_credentials_handler(
+    request: Request, exc: exceptions.InvalidCredentialsError
+):
     """Handle InvalidCredentialsError by returning 401"""
     logger.warning(f"InvalidCredentialsError: {exc.message} (path: {request.url.path})")
     return JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        content={
-            "error": "Authentication Failed",
-            "message": exc.message
-        },
-        headers={"WWW-Authenticate": "Bearer"}
+        content={"error": "Authentication Failed", "message": exc.message},
+        headers={"WWW-Authenticate": "Bearer"},
     )
-

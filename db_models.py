@@ -36,6 +36,12 @@ class User(Base):
 
     # Relationships
     tasks = relationship("Task", back_populates="owner")
+    notification_preferences = relationship(
+        "NotificationPreference",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan"
+    )
 
 class TaskFile(Base):
     __tablename__ = "task_files"
@@ -83,6 +89,28 @@ class TaskShare(Base):
     __table_args__ = (
         UniqueConstraint('task_id', 'shared_with_user_id', name='unique_task_share'),
     )
-                     
+
+class NotificationPreference(Base):
+    __tablename__ = "notification_preferences"
+
+    # Link directly to User ID (One-to-One)
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    
+    # Status
+    email_verified = Column(Boolean, default=False)
+    email_enabled = Column(Boolean, default=True) # Master switch
+    
+    # Granular Preferences (Defaults to True)
+    task_shared_with_me = Column(Boolean, default=True)
+    task_completed = Column(Boolean, default=True)
+    comment_on_my_task = Column(Boolean, default=True)
+    task_due_soon = Column(Boolean, default=False)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationship back to User
+    user = relationship("User", back_populates="notification_preferences")                 
     
 
