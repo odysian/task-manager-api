@@ -18,6 +18,7 @@ resource "aws_instance" "api" {
     aws_secret_access_key = var.aws_secret_access_key
     aws_region            = var.aws_region
     s3_bucket_name        = var.s3_bucket_name
+    sns_topic_arn         = aws_sns_topic.notifications.arn
   }))
 
   tags = {
@@ -64,7 +65,19 @@ data "aws_iam_policy_document" "ec2_s3_access" {
       "arn:aws:s3:::${var.s3_bucket_name}/*"
     ]
   }
+
+  statement {
+    effect = "Allow"
+    actions = [
+      "sns:Publish",
+      "sns:Subscribe",
+      "sns:Unsubscribe",
+      "sns:ListSubscriptionsByTopic"
+    ]
+    resources = ["arn:aws:sns:${var.aws_region}:*:task-manager-notifications"]
+  }
 }
+
 resource "aws_iam_policy" "ec2_s3_policy" {
   name   = "${var.project_name}-ec2-s3-policy"
   policy = data.aws_iam_policy_document.ec2_s3_access.json

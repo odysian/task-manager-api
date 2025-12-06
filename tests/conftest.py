@@ -3,6 +3,8 @@ import os
 # Set testing flag before importing rate limiter
 os.environ["TESTING"] = "true"
 
+from unittest.mock import patch
+
 import pytest
 import redis
 from fastapi.testclient import TestClient
@@ -10,31 +12,30 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from main import app
-from db_config import Base, get_db
 import db_models
-
-
+from db_config import Base, get_db
+from main import app
 
 # TEST DATABASE CONFIGURATION
 
 # Test database URL - points to task_manager_test instead of task_manager
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql://task_user:dev_password@localhost/task_manager_test"
+    "postgresql://task_user:dev_password@localhost/task_manager_test",
 )
 
 # Create test engine
 test_engine = create_engine(
     TEST_DATABASE_URL,
-    poolclass= StaticPool,
+    poolclass=StaticPool,
 )
 
 # Create test session factory
 TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
 # Redis client for clearing cache
-redis_client = redis.Redis(host='localhost', port=6379, db=0)
+redis_client = redis.Redis(host="localhost", port=6379, db=0)
+
 
 # DATABASE FIXTURES
 @pytest.fixture(scope="function")
@@ -58,13 +59,14 @@ def db_session():
         # Drop all tables after test (clean slate for next test)
         Base.metadata.drop_all(bind=test_engine)
 
-    
+
 # CLIENT FIXTURE
 @pytest.fixture(scope="function")
 def client(db_session):
     """
     Creates a test client with overridden database dependency.
     """
+
     # Override the get_db dependency to use our test database
     def override_get_db():
         try:
@@ -81,6 +83,7 @@ def client(db_session):
     # Clean up: remove the override
     app.dependency_overrides.clear()
 
+
 # AUTHENTICATION FIXTURES
 @pytest.fixture(scope="function")
 def test_user(client):
@@ -90,7 +93,7 @@ def test_user(client):
     user_data = {
         "username": "testuser",
         "email": "test@example.com",
-        "password": "testpass123"
+        "password": "testpass123",
     }
 
     # Register the user
@@ -107,15 +110,16 @@ def auth_token(client, test_user):
     Creates a user and returns their authentication token.
     """
     # Login with the test user
-    login_response = client.post("/auth/login", json={
-        "username": test_user["username"],
-        "password": test_user["password"]
-    })
+    login_response = client.post(
+        "/auth/login",
+        json={"username": test_user["username"], "password": test_user["password"]},
+    )
 
     assert login_response.status_code == 200
     token = login_response.json()["access_token"]
 
     return token
+
 
 @pytest.fixture(scope="function")
 def authenticated_client(client, auth_token):
@@ -123,12 +127,10 @@ def authenticated_client(client, auth_token):
     Returns a client with authentication headers already set.
     """
     # Add the Authorization header to the client
-    client.headers = {
-        **client.headers,
-        "Authorization": f"Bearer {auth_token}"
-    }
+    client.headers = {**client.headers, "Authorization": f"Bearer {auth_token}"}
 
     return client
+
 
 @pytest.fixture(scope="function")
 def create_user_and_token(client):
@@ -136,20 +138,35 @@ def create_user_and_token(client):
     Factory fixture that creates a user and returns their token.
     Can be called multiple times to create multiple users.
     """
+
     def _create_user(username: str, email: str, password: str):
         # Register user
-        client.post("/auth/register", json={
-            "username": username,
-            "email": email,
-            "password": password
-        })
+        client.post(
+            "/auth/register",
+            json={"username": username, "email": email, "password": password},
+        )
 
         # Login and get token
-        login_response = client.post("/auth/login", json={
-            "username": username,
-            "password": password
-        })
+        login_response = client.post(
+            "/auth/login", json={"username": username, "password": password}
+        )
 
         return login_response.json()["access_token"]
-    
+
     return _create_user
+
+
+@pytest.fixture(scope="function", autouse=True)
+def patch_background_tasks_db(db_session):
+    """
+    Forces background tasks to use the same Test Database as the rest of the test.
+    We patch the 'SessionLocal' that is imported inside background_tasks.py
+    """
+    # Create a factory that returns our existing test session
+    # Or creates a new one bound to the test engin
+
+    def test_session_factory():
+        return TestSessionLocal()
+
+    with patch("background_tasks.SessionLocal", side_effect=test_session_factory):
+        yield
