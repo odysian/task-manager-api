@@ -18,6 +18,7 @@ resource "aws_instance" "api" {
     aws_secret_access_key = var.aws_secret_access_key
     aws_region            = var.aws_region
     s3_bucket_name        = var.s3_bucket_name
+    sns_topic_arn         = aws_sns_topic.notifications.arn
   }))
 
   tags = {

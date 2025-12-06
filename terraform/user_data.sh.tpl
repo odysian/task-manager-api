@@ -37,6 +37,7 @@ ALLOWED_EXTENSIONS=.jpg,.jpeg,.png,.gif,.pdf,.txt,.doc,.docx
 RATE_LIMIT_ENABLED=true
 TESTING=false
 ENVIRONMENT=production
+SNS_TOPIC_ARN=${sns_topic_arn}
 EOF
 
 # Wait for RDS to be available (can take 5+ minutes after RDS resource created)

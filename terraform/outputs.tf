@@ -22,3 +22,6 @@ output "ssh_command" {
   description = "SSH into EC2"
   value       = "ssh -i ~/.ssh/${var.key_name}.pem ec2-user@${aws_eip.api.public_ip}"
 }
+output "sns_topic_arn" {
+  value = aws_sns_topic.notifications.arn
+}
