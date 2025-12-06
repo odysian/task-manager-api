@@ -42,9 +42,7 @@ def test_notification_preferences(authenticated_client):
     assert data["email_enabled"] is True
 
 
-def test_notification_lifecycle(
-    client, create_user_and_token, mock_sns, patch_background_tasks_db
-):
+def test_notification_lifecycle(client, create_user_and_token, mock_sns):
     # Bob's email is verified
     # Alice shares task with bob
     # Assert that sns_client is called when sharing task
@@ -79,9 +77,7 @@ def test_notification_lifecycle(
     mock_sns.publish.assert_called_once()
 
 
-def test_comment_notification(
-    client, create_user_and_token, mock_sns, patch_background_tasks_db
-):
+def test_comment_notification(client, create_user_and_token, mock_sns):
     """Test that task owner gets notified when someone comments"""
     # ARRANGE
     user_a_token = create_user_and_token("Alice", "usera@test.com", "password123")
@@ -126,9 +122,7 @@ def test_comment_notification(
     assert "Bob" in call_args.kwargs["Message"]
 
 
-def test_completed_notification(
-    client, create_user_and_token, mock_sns, patch_background_tasks_db
-):
+def test_completed_notification(client, create_user_and_token, mock_sns):
     """Test that task owner gets notified when someone marks their task completed"""
     # ARRANGE
     user_a_token = create_user_and_token("Alice", "usera@test.com", "password123")
@@ -174,9 +168,7 @@ def test_completed_notification(
     assert "Bob" in call_args.kwargs["Message"]
 
 
-def test_notification_guards(
-    client, create_user_and_token, mock_sns, patch_background_tasks_db
-):
+def test_notification_guards(client, create_user_and_token, mock_sns):
     """Test that endpoints respect preferences"""
     # ARRANGE
     user_a_token = create_user_and_token("Alice", "usera@test.com", "password123")

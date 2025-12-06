@@ -156,7 +156,7 @@ def create_user_and_token(client):
     return _create_user
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="function", autouse=True)
 def patch_background_tasks_db(db_session):
     """
     Forces background tasks to use the same Test Database as the rest of the test.
