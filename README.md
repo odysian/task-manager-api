@@ -9,12 +9,14 @@ A REST API built with FastAPI, PostgreSQL, and Redis. This is my first major Pyt
 A full-featured task management API with:
 - Complete CRUD operations with advanced filtering and search
 - User authentication with JWT tokens
-- Multi-user support (users only see their own tasks)
-- File attachments (upload images/documents to tasks)
+- Multi-user support with task sharing and granular permissions
+- File attachments (upload images/documents to tasks via S3)
+- **Activity logging and audit trails** (tracks all user actions)
+- Comments system on tasks
 - Background tasks (async notifications and cleanup)
 - Redis caching 
 - Rate limiting 
-- 38 passing tests with pytest
+- **69 passing tests** with pytest
 - Production-quality logging
 - Automated CI/CD pipeline with zero-downtime deployments
 
@@ -25,6 +27,8 @@ A full-featured task management API with:
 - **Backend:** FastAPI, Python 3.12
 - **Database:** PostgreSQL with SQLAlchemy ORM
 - **Caching:** Redis
+- **Storage:** AWS S3 (file uploads)
+- **Notifications:** AWS SNS (email notifications)
 - **Auth:** JWT tokens, bcrypt password hashing
 - **Testing:** pytest with test database isolation
 - **Deployment:** Docker, GitHub Actions, GitHub Container Registry
@@ -48,18 +52,33 @@ A full-featured task management API with:
 - Filter tasks by tag
 
 **Files:**
-- Upload files to tasks (images, PDFs, documents)
-- Download files
+- Upload files to tasks (images, PDFs, documents) to AWS S3
+- Download files with proper permission checks
 - Delete files
 - Automatic cleanup when task is deleted
+
+**Comments:**
+- Add comments to tasks
+- Update/delete your own comments
+- View all comments on tasks you have access to
+- Comment authors can always edit their own comments
 
 **Collaboration:**
 - Share tasks with other users via username
 - RBAC System: Granular permission levels (`VIEW`, `EDIT`, `OWNER`)
-- File uploads and comments respect shared permission level (Viewers can download files but not delete them)
+- File uploads and comments respect shared permission level
+- Viewers can download files but not delete them
+
+**Activity Logging:** *(New!)*
+- Comprehensive audit trail of all user actions
+- Tracks task creation, updates, deletion, sharing
+- Captures old/new values for update operations
+- Logs comment and file activity
+- Query by action type, resource type, or date range
+- Task timeline view shows complete history
+- Activity statistics by action and resource type
 
 **Notifications:**
-
 - Event-driven transactional emails via AWS SNS
 - Triggers on task sharing, completion, and comments
 - Granular user preferences (opt-in/opt-out per event type)
@@ -76,6 +95,7 @@ A full-featured task management API with:
 - Redis caching on stats endpoint (5x faster)
 - Background tasks for slow operations
 - Rate limiting to prevent abuse
+- Eager loading to prevent N+1 queries
 
 **CI/CD:**
 - Automated testing on pull requests
@@ -84,6 +104,8 @@ A full-featured task management API with:
 - Automatic rollback on deployment failure
 
 ---
+
+![API Documentation Screenshot](notes/screenshot.png)
 
 ## API Endpoints
 
@@ -107,29 +129,34 @@ DELETE /tasks/{id}/tags/{tag} - Remove tag
 ```
 
 ### Sharing
-
 ```
-POST   /tasks/{id}/share             - Share task with user
-GET    /tasks/shared-with-me         - List tasks shared with you
-PUT    /tasks/{id}/share/{user_id}   - Update permission (View <-> Edit)
-DELETE /tasks/{id}/share/{user_id}   - Revoke access (Unshare)
+POST   /tasks/{id}/share              - Share task with user
+GET    /tasks/shared-with-me          - List tasks shared with you
+PUT    /tasks/{id}/share/{username}   - Update permission (View <-> Edit)
+DELETE /tasks/{id}/share/{username}   - Revoke access (Unshare)
 ```
 
 ### Comments
-
 ```
 POST   /tasks/{task_id}/comments     - Add comment
 GET    /tasks/{task_id}/comments     - List comments by task id
-PATCH  /comments/{comment_id}       - Update comment
-DELETE /comments/{comment_id}        - Delete comment
+PATCH  /tasks/{task_id}/comments/{comment_id}  - Update comment
+DELETE /tasks/{task_id}/comments/{comment_id}  - Delete comment
 ```
 
 ### Files
 ```
-POST   /tasks/{id}/files   - Upload file
+POST   /tasks/{id}/files   - Upload file to S3
 GET    /tasks/{id}/files   - List files
 GET    /files/{id}         - Download file
 DELETE /files/{id}         - Delete file
+```
+
+### Activity Logs *(New!)*
+```
+GET    /activity                - Get your activity history (with filters)
+GET    /activity/tasks/{id}     - Get complete timeline for a task
+GET    /activity/stats          - Get activity statistics
 ```
 
 ### Notifications
@@ -142,9 +169,10 @@ POST   /notifications/verify        - Verify email address
 
 ### Health
 ```
-GET    /health             - Check API status and database connection
-GET    /version            - Returns version and environment
+GET    /health   - Check API status and database connection
+GET    /version  - Returns version and environment
 ```
+
 ---
 
 ## What I Learned
@@ -158,26 +186,40 @@ GET    /version            - Returns version and environment
 **Database Integration**
 - SQLAlchemy ORM (models, sessions, queries)
 - Database migrations with Alembic
+- Polymorphic database design (activity logs track multiple resource types)
+- JSON columns for flexible metadata storage
+- Strategic indexing for query performance
 
-**Authentication**
+**Authentication & Authorization**
 - JWT token generation and validation
 - Password hashing
 - Protected routes with dependencies
 - Multi-user data isolation
+- RBAC with permission hierarchies (`OWNER` > `EDIT` > `VIEW`)
 
 **Testing & Error Handling**
 - pytest with test database isolation
-- Writing tests for CRUD, auth, authorization
+- **69 comprehensive tests** covering all features
 - Custom exception classes
 - Centralized error handling
-- Production logging (helped to fix several bugs)
+- Production logging (helped fix several bugs)
+- Mocking external services (S3, SNS) for faster tests
 
 **Advanced Features**
 - Background tasks (async operations that don't block responses)
-- File uploads with validation and storage
+- File uploads with validation and S3 storage
 - Redis caching (noticeable performance improvement)
 - Rate limiting (prevent brute force and spam)
-- SQLAlchemy relationships in action
+- SQLAlchemy relationships and eager loading
+
+**Activity Logging** *(What I learned building this feature)*
+- Service layer pattern for separating business logic
+- Capturing state before/after for audit trails
+- **Transaction safety** - logging must happen before commit
+- **Critical ordering** - must log deletions before deleting (to capture data)
+- Polymorphic patterns for flexible data models
+- Date serialization for JSON storage (`.isoformat()`)
+- Query optimization with `joinedload()` to prevent N+1 queries
 
 **CI/CD & Deployment**
 - GitHub Actions for automated testing and deployment
@@ -190,16 +232,10 @@ GET    /version            - Returns version and environment
 - Reinforced Terraform concepts from previous AWS project
 - More practice with user_data scripts
 
-**Advanced Authorization (RBAC)**
-  - Moved beyond simple ownership checks (`user_id == current_user`) to a full RBAC system
-  - Implemented Many-to-Many relationships using a junction table (`TaskShare`)
-  - Designed permission hierarchies (`OWNER` > `EDIT` > `VIEW`)
-  - Mocking external services (S3) to test permission logic without network calls
-
-**Event-Driven Architecture:**
-- Decoupled notification logic using AWS SNS and background tasks
-- Implemented "Guard Pattern" to handle user preferences and privacy
-- Managed complex side-effects (external API calls) in testing using unittest.mock
+**Code Quality**
+- Linting with pylint, black, and isort
+- Consistent code formatting
+- Professional code standards (achieved 10/10 pylint score)
 
 ---
 
@@ -236,26 +272,36 @@ GET    /version            - Returns version and environment
 - Zero downtime for users
 
 **RBAC is complex but useful:**
-
-  - Simple ownership checks break down when you add sharing
-  - Centralized permission "guards" (`require_task_access`) prevent duplicated logic
-  - Permissions must cascade to children (if I can't edit the task, I shouldn't be able to delete its files)
+- Simple ownership checks break down when you add sharing
+- Centralized permission "guards" (`require_task_access`) prevent duplicated logic
+- Permissions must cascade to children (if I can't edit the task, I shouldn't delete its files)
 
 **Mocking is essential for cloud testing:**
+- Testing S3 file permissions locally is hard/tedious
+- Used `unittest.mock` to "spy" on boto3
+- Proved that read-only users *never even attempt* to call AWS
 
-  - Testing S3 file permissions locally is hard/expensive
-  - Used `unittest.mock` to "spy" on boto3
-  - Proved that read-only users *never even attempt* to call AWS, ensuring security logic works offline
+**Activity logging patterns:**
+- Must flush database to get IDs before logging
+- Must capture old values BEFORE applying updates
+- Must log deletions BEFORE deleting (data disappears otherwise)
+- Service layer keeps business logic separate from HTTP handlers
+- Transaction safety ensures logs and changes commit together (or both roll back)
 
-**Data modeling for sharing:**
+**N+1 query problem:**
+- Accessing relationships in loops creates hidden queries
+- Use `joinedload()` to fetch related data upfront
+- One query is better than 100 queries
+- Made a noticeable difference in activity endpoint performance
 
-  - Many-to-Many relationships require extra care (Foreign Keys, Unique Constraints)
-  - Pydantic models can get stuck in recursion loops if you aren't careful with relationships (fixed by manually mapping fields)
+**Date serialization:**
+- Python date objects aren't JSON-serializable
+- Convert to ISO format strings with `.isoformat()`
+- Important for storing dates in JSON columns
 
 ---
 
 ## Development Setup
-
 ```bash
 # Clone repo
 git clone https://github.com/odysian/task-manager-api
@@ -291,7 +337,6 @@ Visit http://localhost:8000/docs for interactive API documentation.
 ---
 
 ## Testing
-
 ```bash
 # Run all tests
 pytest
@@ -299,16 +344,18 @@ pytest
 # Run with verbose output
 pytest -v
 
+# Run with coverage
+pytest --cov
+
 # Run specific test file
-pytest tests/test_auth.py
+pytest tests/test_activity.py
 ```
 
-**Test coverage:** 38 tests covering auth, CRUD operations, validation, query parameters, stats, bulk operations, and tags.
+**Test coverage:** 69 tests covering auth, CRUD operations, validation, query parameters, stats, bulk operations, tags, sharing, permissions, comments, files, activity logging, and notifications.
 
 ---
 
 ## Project Structure
-
 ```
 task-manager-api/
 ├── main.py                    # App setup, exception handlers
@@ -322,12 +369,17 @@ task-manager-api/
 ├── exceptions.py              # Custom exceptions
 ├── logging_config.py          # Logging setup
 ├── background_tasks.py        # Background task functions
+├── activity_service.py        # Activity logging service layer
 ├── routers/
 │   ├── auth.py               # Registration, login
 │   ├── tasks.py              # Task endpoints
-│   ├── health.py             # Basic health check
-│   └── files.py              # File upload/download
-├── tests/                    # 38 pytest tests
+│   ├── sharing.py            # Task sharing endpoints
+│   ├── comments.py           # Comment endpoints
+│   ├── files.py              # File upload/download
+│   ├── activity.py           # Activity log endpoints
+│   ├── notifications.py      # Notification preferences
+│   └── health.py             # Health check
+├── tests/                    # 69 pytest tests
 ├── uploads/                  # Uploaded files (not in Git)
 ├── logs/                     # Application logs (not in Git)
 ├── terraform/                # Infrastructure as Code
@@ -338,19 +390,23 @@ task-manager-api/
 
 ## Current Status
 
-**Completed:** Event-Driven Notifications
+**Just Completed:** Activity Logging & Audit Trails
 
 **What's Working:**
+- Complete activity history for all user actions
+- Task timelines showing all changes over time
+- Activity statistics and filtering
+- 69 passing tests with comprehensive coverage
 - Automated testing on every pull request
 - Zero-downtime deployments on merge to main
 - Docker builds with layer caching (20 sec)
 - Blue-green deployment with automatic rollback
 - Production API live on AWS
+- Code quality: 10/10 pylint score
 
-**Next Up:** 
-- Monitoring and alerting (CloudWatch)
-- Multi-environment setup (staging + production)
-- Database backups and disaster recovery
+**What's Next:**
+- Polish and finalize documentation
+- Move to Project #2 (different domain, apply learned patterns)
 
 ---
 
@@ -361,6 +417,7 @@ task-manager-api/
                              / RDS PostgreSQL
 Internet -> EC2 (Docker) -> │  ElastiCache Redis  
                              \ S3 (file storage)
+                               SNS (notifications)
                              
 GitHub -> Actions -> GHCR -> EC2 (pull & deploy)
 ```
@@ -369,7 +426,7 @@ GitHub -> Actions -> GHCR -> EC2 (pull & deploy)
 
 **On Pull Request:**
 - GitHub Actions spins up PostgreSQL and Redis
-- Runs 38 pytest tests
+- Runs 69 pytest tests
 - Reports pass/fail status on PR
 
 **On Merge to Main:**
@@ -383,7 +440,7 @@ GitHub -> Actions -> GHCR -> EC2 (pull & deploy)
 - If healthy: switches to port 8000
 - If unhealthy: automatic rollback
 
-**Production URL:** http://35.173.172.18:8000/docs
+**Production URL:** http://35.173.172.18:8000/docs (Note: AWS instance may be paused to minimize costs.)
 
 ### Local Development with Docker
 ```bash
@@ -410,7 +467,6 @@ Access API at: http://localhost:8000/docs
 - 3 Security Groups with proper isolation
 - Elastic IP for static addressing
 - Automated bootstrap via user data script
-
 ```bash
 cd terraform
 terraform init
@@ -426,13 +482,40 @@ terraform apply  # ~10-15 minutes
 - Runs migrations
 - Starts application container
 
+---
+
+## Database Schema
+
+**Key tables:**
+- `users` - User accounts and auth
+- `tasks` - Task data with owner relationship
+- `task_shares` - Many-to-many sharing with permissions
+- `task_comments` - Comments on tasks
+- `task_files` - File metadata (stored in S3)
+- `activity_logs` - Complete audit trail of all actions
+- `notification_preferences` - User notification settings
+
+The `activity_logs` table uses a **polymorphic pattern**: `resource_type` + `resource_id` allows tracking any resource (tasks, comments, files) without separate tables.
 
 ---
 
-## Resources
+## Resources That Helped Me
 
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [SQLAlchemy 2.0 Docs](https://docs.sqlalchemy.org/en/20/)
 - [Pytest Documentation](https://docs.pytest.org/)
 - [Redis Documentation](https://redis.io/docs/)
 - [Real Python](https://realpython.com/)
+
+---
+
+## Contact
+
+**Chris** 
+- GitHub: [@odysian](https://github.com/odysian)
+- Currently learning: Backend development, building portfolio projects
+- Next: Starting Project #2 to reinforce these patterns in a different domain
+
+---
+
+*This project represents the first 3 weeks of my 16-week backend engineering roadmap. Built to demonstrate backend fundamentals for junior backend developer roles.*
