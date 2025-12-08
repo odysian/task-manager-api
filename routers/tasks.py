@@ -3,7 +3,7 @@ import logging
 import time
 from collections import Counter
 from datetime import date, datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import (
     APIRouter,
@@ -35,6 +35,18 @@ from redis_config import get_cache, invalidate_user_cache, set_cache
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 logger = logging.getLogger(__name__)
+
+
+def serialize_value(value: Any) -> Any:
+    """Convert non-JSON serializable types to JSON-compatible formats."""
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    elif isinstance(value, list):
+        return [serialize_value(item) for item in value]
+    elif isinstance(value, dict):
+        return {k: serialize_value(v) for k, v in value.items()}
+    else:
+        return value
 
 
 # --- Endpoints ---
@@ -389,7 +401,7 @@ def update_task(
 
     old_values = {}
     for field in update_data.keys():
-        old_values[field] = getattr(task, field)
+        old_values[field] = serialize_value(getattr(task, field))
 
     # Check if task is being marked as complete for first time
     was_incomplete = not task.completed  # type: ignore
@@ -401,7 +413,7 @@ def update_task(
 
     new_values = {}
     for field in update_data.keys():
-        new_values[field] = getattr(task, field)
+        new_values[field] = serialize_value(getattr(task, field))
 
     activity_service.log_task_updated(
         db_session=db_session,

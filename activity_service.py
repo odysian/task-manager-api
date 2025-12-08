@@ -1,5 +1,6 @@
 # pyright: reportGeneralTypeIssues=false
 
+from datetime import date, datetime
 from typing import Any, Optional, cast
 
 from sqlalchemy.orm import Session
@@ -38,6 +39,12 @@ def log_task_created(
     db_session: Session, user_id: int, task: db_models.Task
 ) -> db_models.ActivityLog:
     """Log task creation."""
+
+    def serialize(value):
+        if isinstance(value, (date, datetime)):
+            return value.isoformat()
+        return value
+
     return log_activity(
         db_session=db_session,
         user_id=user_id,
@@ -48,7 +55,8 @@ def log_task_created(
             "title": task.title,
             "priority": task.priority,
             "completed": task.completed,
-            "tags": task.tags if task.tags else [],  # type: ignore
+            "tags": task.tags if task.tags else [],
+            "due_date": task.due_date.isoformat() if task.due_date else None,
         },
     )
 
@@ -96,6 +104,7 @@ def log_task_deleted(
             "priority": task.priority,
             "completed": task.completed,
             "tags": task.tags if task.tags else [],  # type: ignore
+            "due_date": task.due_date.isoformat() if task.due_date else None,
         },
     )
 

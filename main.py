@@ -13,7 +13,16 @@ from fastapi.responses import JSONResponse
 
 import exceptions
 from logging_config import setup_logging
-from routers import auth, comments, files, health, notifications, sharing, tasks
+from routers import (
+    activity,
+    auth,
+    comments,
+    files,
+    health,
+    notifications,
+    sharing,
+    tasks,
+)
 
 # cd task-manager-api
 # source venv/bin/activate
@@ -72,6 +81,7 @@ tags_metadata = [
         "description": "File attachments and downloads.",
     },
     {"name": "notifications", "description": "Send notifications with SNS."},
+    {"name": "activity", "description": "Activity and task timeline."},
     {
         "name": "health",
         "description": "API health checks.",
@@ -114,6 +124,7 @@ app.include_router(files.files_router)
 app.include_router(health.router)
 app.include_router(comments.task_comments_router)
 app.include_router(comments.comments_router)
+app.include_router(activity.router)
 
 
 # --- Exception Handlers ---
