@@ -11,6 +11,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
+import activity_service
 import db_models
 import exceptions
 from background_tasks import notify_comment_added
@@ -50,6 +51,11 @@ def add_comment(
     )
 
     db_session.add(comment)
+    db_session.flush()
+
+    activity_service.log_comment_created(
+        db_session=db_session, user_id=current_user.id, comment=comment  # type: ignore
+    )
     db_session.commit()
     db_session.refresh(comment)
 
@@ -125,7 +131,19 @@ def update_comment(
             detail=f"User {current_user.id} is not authorized to access comment_id={comment_id}",
         )
 
+    old_content = comment.content
+
     comment.content = comment_data.content  # type: ignore
+
+    new_content = comment.content
+
+    activity_service.log_comment_updated(
+        db_session=db_session,
+        user_id=current_user.id,  # type: ignore
+        comment=comment,
+        old_content=old_content,  # type: ignore
+        new_content=new_content,  # type: ignore
+    )
 
     db_session.commit()
     db_session.refresh(comment)
@@ -171,6 +189,9 @@ def delete_comment(
             detail=f"User {current_user.id} is not authorized to access comment_id={comment_id}",
         )
 
+    activity_service.log_comment_deleted(
+        db_session=db_session, user_id=current_user.id, comment=comment  # type: ignore
+    )
     db_session.delete(comment)
     db_session.commit()
 

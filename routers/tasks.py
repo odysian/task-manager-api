@@ -16,6 +16,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
+import activity_service
 import db_models
 import exceptions
 from background_tasks import cleanup_after_task_deletion, notify_task_completed
@@ -340,6 +341,10 @@ def create_task(
         user_id=current_user.id,
     )
     db_session.add(new_task)
+    db_session.flush()
+    activity_service.log_task_created(
+        db_session=db_session, user_id=current_user.id, task=new_task  # type: ignore
+    )
     db_session.commit()
     db_session.refresh(new_task)
 
@@ -382,6 +387,10 @@ def update_task(
             detail="No fields provided for update",
         )
 
+    old_values = {}
+    for field in update_data.keys():
+        old_values[field] = getattr(task, field)
+
     # Check if task is being marked as complete for first time
     was_incomplete = not task.completed  # type: ignore
     is_being_marked_complete = update_data.get("completed") is True
@@ -389,6 +398,18 @@ def update_task(
     # Update the task
     for field, value in update_data.items():
         setattr(task, field, value)
+
+    new_values = {}
+    for field in update_data.keys():
+        new_values[field] = getattr(task, field)
+
+    activity_service.log_task_updated(
+        db_session=db_session,
+        user_id=current_user.id,  # type: ignore
+        task=task,
+        old_values=old_values,
+        new_values=new_values,
+    )
 
     db_session.commit()
     db_session.refresh(task)
@@ -440,6 +461,10 @@ def delete_task_id(
 
     # Get list of files to delete from disk
     file_list = [file.stored_filename for file in task.files]
+
+    activity_service.log_task_deleted(
+        db_session=db_session, user_id=current_user.id, task=task  # type: ignore
+    )
 
     db_session.delete(task)
     db_session.commit()
