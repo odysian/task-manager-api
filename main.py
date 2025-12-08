@@ -13,16 +13,8 @@ from fastapi.responses import JSONResponse
 
 import exceptions
 from logging_config import setup_logging
-from routers import (
-    activity,
-    auth,
-    comments,
-    files,
-    health,
-    notifications,
-    sharing,
-    tasks,
-)
+from routers import (activity, auth, comments, files, health, notifications,
+                     sharing, tasks)
 
 # cd task-manager-api
 # source venv/bin/activate

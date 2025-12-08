@@ -3,16 +3,15 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import desc
 from sqlalchemy.orm import Session, joinedload
 
-import activity_service
 import db_models
 from db_config import get_db
 from dependencies import TaskPermission, get_current_user, require_task_access
 from exceptions import TaskNotFoundError
-from models import ActivityLogResponse, ActivityQuery
+from models import ActivityLogResponse
 
 router = APIRouter(prefix="/activity", tags=["activity"])
 

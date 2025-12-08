@@ -1,0 +1,19 @@
+[MASTER]
+disable=
+    C0114,  # missing-module-docstring
+    C0115,  # missing-class-docstring
+    C0116,  # missing-function-docstring
+    R0903,  # too-few-public-methods
+    R0913,  # too-many-arguments
+    R0914,  # too-many-locals
+    R0917,  # too-many-positional-arguments
+    R0912,  # too-many-branches
+    R0911,  # too-many-return-statements
+    W1203,  # logging-fstring-interpolation (f-strings in logging are fine)
+    R0801,  # duplicate-code (some duplication is okay)
+
+[FORMAT]
+max-line-length=100
+
+[BASIC]
+good-names=i,j,k,db,id,_

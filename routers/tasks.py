@@ -5,16 +5,10 @@ from collections import Counter
 from datetime import date, datetime
 from typing import Any, Literal, Optional
 
-from fastapi import (
-    APIRouter,
-    BackgroundTasks,
-    Depends,
-    HTTPException,
-    Query,
-    Request,
-    status,
-)
+from fastapi import (APIRouter, BackgroundTasks, Depends, HTTPException, Query,
+                     Request, status)
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 import activity_service
 import db_models
@@ -22,14 +16,8 @@ import exceptions
 from background_tasks import cleanup_after_task_deletion, notify_task_completed
 from db_config import get_db
 from dependencies import TaskPermission, get_current_user, require_task_access
-from models import (
-    BulkTaskUpdate,
-    PaginatedTasks,
-    Task,
-    TaskCreate,
-    TaskStats,
-    TaskUpdate,
-)
+from models import (BulkTaskUpdate, PaginatedTasks, Task, TaskCreate,
+                    TaskStats, TaskUpdate)
 from rate_limit_config import limiter
 from redis_config import get_cache, invalidate_user_cache, set_cache
 
@@ -41,12 +29,14 @@ def serialize_value(value: Any) -> Any:
     """Convert non-JSON serializable types to JSON-compatible formats."""
     if isinstance(value, (date, datetime)):
         return value.isoformat()
-    elif isinstance(value, list):
+
+    if isinstance(value, list):
         return [serialize_value(item) for item in value]
-    elif isinstance(value, dict):
+
+    if isinstance(value, dict):
         return {k: serialize_value(v) for k, v in value.items()}
-    else:
-        return value
+
+    return value
 
 
 # --- Endpoints ---
@@ -125,13 +115,13 @@ def get_all_tasks(
         if overdue:
             query = query.filter(
                 db_models.Task.due_date.isnot(None),
-                db_models.Task.completed == False,
+                db_models.Task.completed.is_(False),
                 db_models.Task.due_date < today,
             )
         else:
             query = query.filter(
                 (db_models.Task.due_date.is_(None))
-                | (db_models.Task.completed == True)
+                | (db_models.Task.completed.is_(True))
                 | (db_models.Task.due_date >= today)
             )
 
@@ -176,7 +166,8 @@ def get_task_stats(
         stats_dict = json.loads(cached_stats)
         elapsed_time = (time.time() - start_time) * 1000
         logger.info(
-            f"Returning cached statistics for user_id={current_user.id} | Time: {elapsed_time:.2f}ms"
+            f"Returning cached statistics for user_id={current_user.id} "
+            f"| Time: {elapsed_time:.2f}ms"
         )
         return stats_dict
 
@@ -228,7 +219,8 @@ def get_task_stats(
 
     elapsed_time = (time.time() - start_time) * 1000
     logger.info(
-        f"Successfully calculated and cached statistics for user_id={current_user.id} | Time: {elapsed_time:.2f}ms"
+        f"Successfully calculated and cached statistics for "
+        f"user_id={current_user.id} | Time: {elapsed_time:.2f}ms"
     )
 
     return stats_dict
@@ -332,7 +324,7 @@ def get_task_id(
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=Task)
 @limiter.limit("100/hour")  # 100 tasks per hour
 def create_task(
-    request: Request,
+    request: Request,  # pylint: disable=unused-argument
     task_data: TaskCreate,
     db_session: Session = Depends(get_db),
     current_user: db_models.User = Depends(get_current_user),
@@ -484,7 +476,7 @@ def delete_task_id(
     background_tasks.add_task(
         cleanup_after_task_deletion,
         task_id=task.id,  # type: ignore
-        task_title=task.title,  # type: ignore
+        task_title=task_title,  # type: ignore
         file_list=file_list,
     )
     logger.info(
@@ -493,8 +485,6 @@ def delete_task_id(
 
     # Invalidate stats cache since task count changed
     invalidate_user_cache(current_user.id)  # type: ignore
-
-    return None
 
 
 @router.post("/{task_id}/tags", response_model=Task)
@@ -521,8 +511,6 @@ def add_tags(
             task.tags.append(tag)
 
     # Mark the tags field as modified (PostgreSQL array needs this)
-    from sqlalchemy.orm.attributes import flag_modified
-
     flag_modified(task, "tags")
 
     db_session.commit()
@@ -558,8 +546,6 @@ def remove_tag(
         raise exceptions.TagNotFoundError(task_id=task_id, tag=tag)
 
     task.tags.remove(tag)
-
-    from sqlalchemy.orm.attributes import flag_modified
 
     flag_modified(task, "tags")
 

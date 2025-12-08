@@ -1,14 +1,6 @@
 import logging
 
-from fastapi import (
-    APIRouter,
-    BackgroundTasks,
-    Depends,
-    HTTPException,
-    Query,
-    Request,
-    status,
-)
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 import activity_service
@@ -124,7 +116,8 @@ def update_comment(
     # Check if task belongs to current user
     if comment.user_id != current_user.id:  # type: ignore
         logger.warning(
-            f"Unauthorized access attempt: user_id={current_user.id} tried to access comment_id={comment_id} owned by user_id={comment.user_id}"
+            f"Unauthorized access attempt: user_id={current_user.id} "
+            f"tried to access comment_id={comment_id} owned by user_id={comment.user_id}"
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -180,13 +173,15 @@ def delete_comment(
     require_task_access(comment.task, current_user, db_session, TaskPermission.VIEW)
 
     # Check if task belongs to current user
-    if comment.user_id != current_user.id and comment.task.user_id != current_user.id:  # type: ignore
+    if current_user.id not in (comment.user_id, comment.task.user_id):  # type: ignore
         logger.warning(
-            f"Unauthorized access attempt: user_id={current_user.id} tried to access comment_id={comment_id} owned by user_id={comment.user_id}"
+            f"Unauthorized access attempt: user_id={current_user.id} "
+            f"tried to access comment_id={comment_id} owned by user_id={comment.user_id}"
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"User {current_user.id} is not authorized to access comment_id={comment_id}",
+            detail=f"User {current_user.id} is not authorized to "
+            f"access comment_id={comment_id}",
         )
 
     activity_service.log_comment_deleted(
@@ -196,5 +191,3 @@ def delete_comment(
     db_session.commit()
 
     logger.info(f"Comment deleted successfully: comment_id={comment_id}")
-
-    return None

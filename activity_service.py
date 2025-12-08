@@ -1,6 +1,5 @@
 # pyright: reportGeneralTypeIssues=false
 
-from datetime import date, datetime
 from typing import Any, Optional, cast
 
 from sqlalchemy.orm import Session
@@ -39,11 +38,6 @@ def log_task_created(
     db_session: Session, user_id: int, task: db_models.Task
 ) -> db_models.ActivityLog:
     """Log task creation."""
-
-    def serialize(value):
-        if isinstance(value, (date, datetime)):
-            return value.isoformat()
-        return value
 
     return log_activity(
         db_session=db_session,
@@ -260,40 +254,40 @@ def get_activity_summary(log: db_models.ActivityLog) -> str:  # type: ignore
             title = details.get("title", "")
             return f"{username} created task '{title}'"
 
-        elif log.action == "updated":
+        if log.action == "updated":
             if "changed_fields" in details:
                 fields = ", ".join(details["changed_fields"])
                 return f"{username} updated {fields}"
             return f"{username} updated {resource}"
 
-        elif log.action == "deleted":
+        if log.action == "deleted":
             title = details.get("title", "")
             return f"{username} deleted task '{title}'"
 
-        elif log.action == "shared":
+        if log.action == "shared":
             shared_with = details.get("shared_with_username", "someone")
             permission = details.get("permission", "access")
             return f"{username} shared task with {shared_with} ({permission})"
 
-        elif log.action == "unshared":
+        if log.action == "unshared":
             unshared = details.get("unshared_username", "someone")
             return f"{username} removed {unshared}'s access to task"
 
     # Comment actions
-    elif log.resource_type == "comment":
+    if log.resource_type == "comment":
         if log.action == "created":
             return f"{username} added a comment"
-        elif log.action == "updated":
+        if log.action == "updated":
             return f"{username} edited a comment"
-        elif log.action == "deleted":
+        if log.action == "deleted":
             return f"{username} deleted a comment"
 
     # File actions
-    elif log.resource_type == "file":
+    if log.resource_type == "file":
         if log.action == "uploaded":
             filename = details.get("filename", "a file")
             return f"{username} uploaded {filename}"
-        elif log.action == "deleted":
+        if log.action == "deleted":
             filename = details.get("filename", "a file")
             return f"{username} deleted {filename}"
 

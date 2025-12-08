@@ -7,10 +7,11 @@ import logging
 import sys
 from pathlib import Path
 
+
 def setup_logging():
     """
     Configure application-wide logging.
-    
+
     Logs are written to both:
     - Console (stdout) - for development
     - File (logs/app.log) - for persistence
@@ -28,25 +29,24 @@ def setup_logging():
 
     # Configure root logger
     logging.basicConfig(
-        level=logging.INFO, # Set minimum log level
+        level=logging.INFO,  # Set minimum log level
         format=log_format,
         datefmt=date_format,
         handlers=[
             # Console handler (prints to terminal)
             logging.StreamHandler(sys.stdout),
-
             # File handler (writes to file)
             logging.FileHandler(
-                log_dir / "app.log",
-                mode="a", # Append mode
-                encoding="utf-8"
-            )
-        ]
+                log_dir / "app.log", mode="a", encoding="utf-8"  # Append mode
+            ),
+        ],
     )
 
     # Set specific log levels for noisy libraries
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING) # Reduc uvicorn noise
-    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING) # Reduce SQL query logging
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)  # Reduc uvicorn noise
+    logging.getLogger("sqlalchemy.engine").setLevel(
+        logging.WARNING
+    )  # Reduce SQL query logging
 
     # Log that logging is configured
     logger = logging.getLogger(__name__)

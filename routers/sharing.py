@@ -34,7 +34,9 @@ def share_task(
 
     # Only owner can share
     if task.user_id != current_user.id:  # type: ignore
-        raise exceptions.UnauthorizedTaskAccessError(task_id=task_id, user_id=current_user.id)  # type: ignore
+        raise exceptions.UnauthorizedTaskAccessError(
+            task_id=task_id, user_id=current_user.id  # type: ignore
+        )
 
     # Look up user to share with
     shared_with_user = (
@@ -152,7 +154,9 @@ def unshare_task(
 
     # Only owner can unshare
     if task.user_id != current_user.id:  # type: ignore
-        raise exceptions.UnauthorizedTaskAccessError(task_id=task_id, user_id=current_user.id)  # type: ignore
+        raise exceptions.UnauthorizedTaskAccessError(
+            task_id=task_id, user_id=current_user.id  # type: ignore
+        )
 
     # Find the share
     share = (
@@ -185,8 +189,6 @@ def unshare_task(
     db_session.delete(share)
     db_session.commit()
 
-    return None
-
 
 @sharing_router.put("/{task_id}/share/{user_id}")
 def update_share_permission(
@@ -206,7 +208,9 @@ def update_share_permission(
 
     # Only owner can unshare
     if task.user_id != current_user.id:  # type: ignore
-        raise exceptions.UnauthorizedTaskAccessError(task_id=task_id, user_id=current_user.id)  # type: ignore
+        raise exceptions.UnauthorizedTaskAccessError(
+            task_id=task_id, user_id=current_user.id  # type: ignore
+        )
 
     # Find the share
     share = (

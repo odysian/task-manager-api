@@ -1,9 +1,9 @@
-from passlib.context import CryptContext
-from jose import JWTError, jwt
-from datetime import datetime, timedelta, timezone
-import os
 import logging
+import os
+from datetime import datetime, timedelta, timezone
 
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 
 # Get and validate settings from environment
 _secret_key = os.getenv("SECRET_KEY")
@@ -22,6 +22,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 720))
 # Configure bcrypt for password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
 def hash_password(password: str) -> str:
     """
     Has a plain password using bcrypt.
@@ -31,6 +32,7 @@ def hash_password(password: str) -> str:
         Hashed password string (safe to store in db)
     """
     return pwd_context.hash(password)
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
@@ -42,6 +44,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         True if passwords match, False otherwise
     """
     return pwd_context.verify(plain_password, hashed_password)
+
 
 def create_access_token(data: dict) -> str:
     """
@@ -58,6 +61,7 @@ def create_access_token(data: dict) -> str:
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+
 def verify_access_token(token: str) -> dict | None:
     """
     Verify and decode a JWT access token.
@@ -66,7 +70,7 @@ def verify_access_token(token: str) -> dict | None:
     Returns:
         Decoded token payload if valid, None if invalid/expired
     """
-    try: 
+    try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
     except JWTError:

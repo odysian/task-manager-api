@@ -1,13 +1,14 @@
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 import db_models
 from db_config import get_db
 from dependencies import get_current_user
 from models import NotificationPreferenceResponse, NotificationPreferenceUpdate
-from notifications import get_or_create_preferences, subscribe_user_to_notifications
+from notifications import (get_or_create_preferences,
+                           subscribe_user_to_notifications)
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 logger = logging.getLogger(__name__)
@@ -47,7 +48,6 @@ def update_notification_preferences(
 
 @router.post("/subscribe", status_code=status.HTTP_200_OK)
 def subscribe_to_notifications(
-    db_session: Session = Depends(get_db),
     current_user: db_models.User = Depends(get_current_user),
 ):
     """

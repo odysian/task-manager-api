@@ -6,7 +6,8 @@ from pathlib import Path
 
 import boto3
 from botocore.exceptions import ClientError
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import (APIRouter, Depends, File, HTTPException, Request,
+                     UploadFile, status)
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -39,7 +40,7 @@ task_files_router = APIRouter(prefix="/tasks", tags=["files"])
 files_router = APIRouter(prefix="/files", tags=["files"])
 
 # File size limit (10 MB)
-MAX_FILE_SIZE = int(os.getenv("MAX_UPLOAD_SIZE", 10485760))
+MAX_FILE_SIZE = int(os.getenv("MAX_UPLOAD_SIZE", "10485760"))
 
 # Allowed file types
 ALLOWED_EXTENSIONS_STR = os.getenv(
@@ -61,7 +62,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 )
 @limiter.limit("20/hour")  # 20 file uploads per hour
 async def upload_file(
-    request: Request,
+    request: Request,  # pylint: disable=unused-argument
     task_id: int,
     file: UploadFile = File(...),
     db_session: Session = Depends(get_db),
@@ -73,7 +74,8 @@ async def upload_file(
     - Allowed types: images, PDFs, documents
     """
     logger.info(
-        f"File upload attempt for task_id={task_id} by user_id={current_user.id}: filename={file.filename}"
+        f"File upload attempt for task_id={task_id} \
+        by user_id={current_user.id}: filename={file.filename}"
     )
 
     # Check if task exists and verify access permissions
@@ -87,11 +89,14 @@ async def upload_file(
 
     # Validate file extension
     file_ext = Path(file.filename).suffix.lower()  # type: ignore
+    allowed_types = (", ".join(ALLOWED_EXTENSIONS),)
     if file_ext not in ALLOWED_EXTENSIONS:
         logger.warning(f"Upload failed: invalid file type {file_ext}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File type {file_ext} not allowed. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}",
+            detail=(
+                f"File type {file_ext} not allowed. Allowed types: {allowed_types}"
+            ),
         )
 
     # Read file content
@@ -123,7 +128,7 @@ async def upload_file(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to upload file to storage",
-        )
+        ) from e
 
     logger.info(f"File saved to disk: {stored_filename} ({file_size} bytes)")
 
@@ -147,7 +152,8 @@ async def upload_file(
     db_session.refresh(task_file)
 
     logger.info(
-        f"File uploaded successfully: file_id={task_file.id}, task_id={task_id}, user_id={current_user.id}"
+        f"File uploaded successfully: file_id={task_file.id}, "
+        f"task_id={task_id}, user_id={current_user.id}"
     )
 
     return task_file
@@ -236,13 +242,13 @@ async def download_file(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="File not found in storage",
-            )
-        else:
-            logger.error(f"S3 download failed: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to download file from storage",
-            )
+            ) from e
+
+        logger.error(f"S3 download failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to download file from storage",
+        ) from e
 
 
 @files_router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -294,5 +300,3 @@ def delete_file(
     logger.info(
         f"File deleted successfully: file_id={file_id}, filename={original_filename}"
     )
-
-    return None

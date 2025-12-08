@@ -1,7 +1,8 @@
-import os
-import redis
 import logging
+import os
 from typing import Optional
+
+import redis
 
 logger = logging.getLogger(__name__)
 
@@ -10,12 +11,13 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 # Parse the Redis URL to extract host, port, and database number
 import urllib.parse
+
 parsed = urllib.parse.urlparse(REDIS_URL)
 
 # Redis connection settings
 REDIS_HOST = parsed.hostname or "localhost"
 REDIS_PORT = parsed.port or 6379
-REDIS_DB = int(parsed.path.lstrip('/')) if parsed.path else 0
+REDIS_DB = int(parsed.path.lstrip("/")) if parsed.path else 0
 
 # Cache expiration times
 STATS_CACHE_TTL = 300
@@ -26,7 +28,7 @@ try:
         host=REDIS_HOST,
         port=REDIS_PORT,
         db=REDIS_DB,
-        decode_responses=True # Automatically decode bytes to strings
+        decode_responses=True,  # Automatically decode bytes to strings
     )
     # Test connection
     redis_client.ping()
@@ -43,18 +45,18 @@ def get_cache(key: str) -> Optional[str]:
     """
     if not redis_client:
         return None
-    
-    try: 
+
+    try:
         value = redis_client.get(key)
-        if value: 
+        if value:
             logger.info(f"Cache HIT: {key}")
         else:
             logger.info(f"Cache MISS: {key}")
-        return value # type: ignore
+        return value  # type: ignore
     except Exception as e:
         logger.error(f"Redis GET error: {e}")
         return None
-    
+
 
 def set_cache(key: str, value: str, ttl: int = STATS_CACHE_TTL) -> bool:
     """
@@ -63,7 +65,7 @@ def set_cache(key: str, value: str, ttl: int = STATS_CACHE_TTL) -> bool:
     """
     if not redis_client:
         return False
-    
+
     try:
         redis_client.setex(key, ttl, value)
         logger.info(f"Cache SET: {key} (TTL: {ttl}s)")
@@ -71,7 +73,7 @@ def set_cache(key: str, value: str, ttl: int = STATS_CACHE_TTL) -> bool:
     except Exception as e:
         logger.error(f"Redis SET error: {e}")
         return False
-    
+
 
 def delete_cache(key: str) -> bool:
     """
@@ -80,7 +82,7 @@ def delete_cache(key: str) -> bool:
     """
     if not redis_client:
         return False
-    
+
     try:
         redis_client.delete(key)
         logger.info(f"Cache DELETE: {key}")
@@ -88,7 +90,7 @@ def delete_cache(key: str) -> bool:
     except Exception as e:
         logger.error(f"Redis DELETE error: {e}")
         return False
-    
+
 
 def invalidate_user_cache(user_id: int):
     """Invalidate all cache entries for a user.
@@ -97,5 +99,3 @@ def invalidate_user_cache(user_id: int):
     stats_key = f"stats:user_{user_id}"
     delete_cache(stats_key)
     logger.info(f"Invalidated cache for user_id={user_id}")
-
-    
