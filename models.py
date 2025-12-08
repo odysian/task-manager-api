@@ -1,12 +1,15 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, Literal
-from datetime import datetime, date
+from datetime import date, datetime
+from typing import Any, Literal, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 # --- Task Models ---
 
+
 class TaskCreate(BaseModel):
     """Schema for creating a new task"""
-    title: str = Field(min_length=1, max_length=200) # Can't be empty
+
+    title: str = Field(min_length=1, max_length=200)  # Can't be empty
     description: Optional[str] = Field(default=None, max_length=1000)
     priority: Literal["low", "medium", "high"] = "medium"
     due_date: Optional[date] = None
@@ -21,6 +24,7 @@ class TaskCreate(BaseModel):
 
 class TaskUpdate(BaseModel):
     """Schema for updating a task"""
+
     title: Optional[str] = None
     description: Optional[str] = None
     completed: Optional[bool] = None
@@ -31,6 +35,7 @@ class TaskUpdate(BaseModel):
 
 class Task(BaseModel):
     """Schema for task responses"""
+
     id: int
     title: str
     description: Optional[str] = None
@@ -44,15 +49,19 @@ class Task(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class PaginatedTasks(BaseModel):
     """Schema for paginated task list"""
+
     tasks: list[Task]
     total: int
     page: int
     pages: int
 
+
 class TaskStats(BaseModel):
     """Schema for task statistics"""
+
     total: int
     completed: int
     incomplete: int
@@ -60,21 +69,28 @@ class TaskStats(BaseModel):
     by_tag: dict[str, int]
     overdue: int
 
+
 class BulkTaskUpdate(BaseModel):
     """Schema for bulk updating tasks"""
-    task_ids: list[int] = Field(min_length=1)   # Must provide at least one ID
-    updates: TaskUpdate   # Reuse the existing TaskUpdate model
+
+    task_ids: list[int] = Field(min_length=1)  # Must provide at least one ID
+    updates: TaskUpdate  # Reuse the existing TaskUpdate model
+
 
 # --- Auth Models ---
 
+
 class UserCreate(BaseModel):
     """Schema to create user"""
+
     username: str = Field(min_length=3, max_length=50)
     email: str = Field(max_length=100)
     password: str = Field(min_length=8, max_length=100)
 
+
 class UserResponse(BaseModel):
     """Schema for return response for users"""
+
     id: int
     username: str
     email: str
@@ -82,15 +98,19 @@ class UserResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class UserLogin(BaseModel):
     username: str
     password: str
+
 
 class Token(BaseModel):
     access_token: str
     token_type: str
 
+
 # --- File Models ---
+
 
 class FileUploadResponse(BaseModel):
     id: int
@@ -103,6 +123,7 @@ class FileUploadResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class TaskFileInfo(BaseModel):
     id: int
     original_filename: str
@@ -113,16 +134,21 @@ class TaskFileInfo(BaseModel):
     class Config:
         from_attributes = True
 
-# --- Comment Models ---      
+
+# --- Comment Models ---
+
 
 class CommentCreate(BaseModel):
     content: str = Field(min_length=1, max_length=1000)
 
+
 class CommentUpdate(BaseModel):
     content: str = Field(min_length=1, max_length=1000)
 
+
 class Comment(BaseModel):
     """Schema for comment responses"""
+
     id: int
     task_id: int
     user_id: int
@@ -132,46 +158,60 @@ class Comment(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-# --- Task Models ---
+
+# --- Share Models ---
+
 
 class TaskShareCreate(BaseModel):
     """Request to share a task"""
-    shared_with_username: str # Username to share with
+
+    shared_with_username: str  # Username to share with
     permission: Literal["view", "edit"] = "view"
+
 
 class TaskShareResponse(BaseModel):
     """Response showing a share"""
+
     id: int
     task_id: int
     shared_with_user_id: int
-    shared_with_username: str # Computer field
+    shared_with_username: str  # Computer field
     permission: str
     shared_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class SharedTaskResponse(BaseModel):
     """Task with sharing context"""
+
     task: Task
-    permission: str # Your permission level
-    is_owner: bool # Are you the owner?
-    
+    permission: str  # Your permission level
+    is_owner: bool  # Are you the owner?
+
+
 class TaskShareUpdate(BaseModel):
     """Request to update a share permission"""
+
     permission: Literal["view", "edit"]
+
 
 # --- Notification Models ---
 
+
 class NotificationPreferenceUpdate(BaseModel):
     """Schema for updating preferences (all optional)"""
+
     email_enabled: Optional[bool] = None
     task_shared_with_me: Optional[bool] = None
     task_completed: Optional[bool] = None
     comment_on_my_task: Optional[bool] = None
     task_due_soon: Optional[bool] = None
 
+
 class NotificationPreferenceResponse(BaseModel):
     """Schema for reading preferences"""
+
     user_id: int
     email_verified: bool
     email_enabled: bool
@@ -183,3 +223,56 @@ class NotificationPreferenceResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+class ActivityLogResponse(BaseModel):
+    """Response model for activity log entries."""
+
+    id: int
+    user_id: int
+    action: str
+    resource_type: str
+    resource_id: int
+    details: Optional[dict[str, Any]] = None
+    created_at: datetime
+    username: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ActivityLogCreate(BaseModel):
+    """Internal model for creating activity logs (not exposed via API)."""
+
+    user_id: int
+    action: str
+    resource_type: str
+    resource_id: int
+    details: Optional[dict[str, Any]] = None
+
+
+class ActivityQuery(BaseModel):
+    """Query parameters for filtering activity logs."""
+
+    resource_type: Optional[str] = None
+    action: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    limit: int = 50
+    offset: int = 0
+
+
+class TaskActivityResponse(BaseModel):
+    """Activity log with enhanced context for task timeline."""
+
+    id: int
+    user_id: int
+    username: str
+    action: str
+    resource_type: str
+    resource_id: int
+    details: dict[str, Any]
+    created_at: datetime
+
+    # Human-readable summary
+    summary: str
+
+    model_config = ConfigDict(from_attributes=True)
