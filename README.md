@@ -413,13 +413,33 @@ task-manager-api/
 ## Deployment
 
 ### Architecture
-```
-                             / RDS PostgreSQL
-Internet -> EC2 (Docker) -> │  ElastiCache Redis  
-                             \ S3 (file storage)
-                               SNS (notifications)
-                             
-GitHub -> Actions -> GHCR -> EC2 (pull & deploy)
+
+```mermaid
+graph TB
+    Client[API Clients<br/>Postman, curl, Apps]
+    
+    FastAPI[FastAPI Application<br/>AWS EC2 - Port 8000<br/>JWT Auth • Rate Limiting • Background Tasks]
+    
+    Postgres[PostgreSQL RDS<br/>Users • Tasks • Comments<br/>Files • Activity Logs • Shares]
+    
+    Redis[Redis ElastiCache<br/>Task Stats Cache]
+    
+    S3[AWS S3<br/>File Uploads<br/>Images & Documents]
+    
+    SNS[AWS SNS<br/>Email Notifications<br/>Task Events]
+    
+    Client <-->|HTTP + JWT| FastAPI
+    FastAPI <-->|All Data| Postgres
+    FastAPI <-->|GET /tasks/stats| Redis
+    FastAPI <-->|Files| S3
+    FastAPI -.->|Async Email| SNS
+    
+    style Client stroke:#1976D2, color:#fff
+    style FastAPI fill:#4CAF50,stroke:#2E7D32,color:#fff
+    style Postgres fill:#336791,stroke:#1A237E,color:#fff
+    style Redis fill:#DC382D,stroke:#B71C1C,color:#fff
+    style S3 fill:#FF9800,stroke:#E65100,color:#fff
+    style SNS fill:#FF9800,stroke:#E65100,color:#fff
 ```
 
 ### CI/CD Pipeline
@@ -461,7 +481,7 @@ Access API at: http://localhost:8000/docs
 
 ### Infrastructure as Code (Terraform)
 
-**13 AWS resources** deployed with one command:
+**15 AWS resources** deployed with one command:
 - EC2 with IAM role for S3 access (no hardcoded credentials)
 - RDS PostgreSQL + ElastiCache Redis
 - 3 Security Groups with proper isolation
