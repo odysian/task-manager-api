@@ -9,12 +9,21 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 import exceptions
 from logging_config import setup_logging
-from routers import (activity, auth, comments, files, health, notifications,
-                     sharing, tasks)
+from routers import (
+    activity,
+    auth,
+    comments,
+    files,
+    health,
+    notifications,
+    sharing,
+    tasks,
+)
 
 # cd task-manager-api
 # source venv/bin/activate
@@ -86,6 +95,14 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
     openapi_tags=tags_metadata,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins (fine for development)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Only add rate limiter if not testing
