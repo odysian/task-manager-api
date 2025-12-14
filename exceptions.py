@@ -40,7 +40,7 @@ class DuplicateUserError(Exception):
     def __init__(self, field: str, value: str):
         self.field = field
         self.value = value
-        self.message = f"{field.capitalize()} '{value}' is already registerd"
+        self.message = f"{field.capitalize()} '{value}' is already registered"
         super().__init__(self.message)
 
 
