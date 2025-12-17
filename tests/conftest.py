@@ -1,5 +1,9 @@
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # Set testing flag before importing rate limiter
 os.environ["TESTING"] = "true"
 
@@ -34,7 +38,8 @@ test_engine = create_engine(
 TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
 # Redis client for clearing cache
-redis_client = redis.Redis(host="localhost", port=6379, db=0)
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6380/0")
+redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 
 
 # DATABASE FIXTURES

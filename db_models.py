@@ -1,7 +1,17 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import (JSON, Boolean, Column, Date, DateTime, ForeignKey,
-                        Index, Integer, String, UniqueConstraint)
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -50,6 +60,7 @@ class User(Base):
 
     # Relationships
     tasks = relationship("Task", back_populates="owner")
+    comments = relationship("TaskComment", back_populates="user")
     notification_preferences = relationship(
         "NotificationPreference",
         back_populates="user",
@@ -92,7 +103,7 @@ class TaskComment(Base):
 
     # Relationships
     task = relationship("Task", back_populates="comments")
-    author = relationship("User")
+    user = relationship("User", back_populates="comments")
 
 
 class TaskShare(Base):
