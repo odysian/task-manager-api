@@ -6,10 +6,65 @@ import db_models
 import exceptions
 from background_tasks import notify_task_shared
 from db_config import get_db
-from dependencies import get_current_user
+from dependencies import TaskPermission, get_current_user, require_task_access
 from models import Task, TaskShareCreate, TaskShareResponse, TaskShareUpdate
 
 sharing_router = APIRouter(prefix="/tasks", tags=["sharing"])
+
+
+@sharing_router.get("/shared-with-me", response_model=list[Task])
+def get_shared_tasks(
+    db_session: Session = Depends(get_db),
+    current_user: db_models.User = Depends(get_current_user),
+):
+    """Get all tasks that have been shared with the current user"""
+
+    # Query for shares where current user is the recipient
+    shares = (
+        db_session.query(db_models.TaskShare)
+        .filter(db_models.TaskShare.shared_with_user_id == current_user.id)
+        .all()
+    )
+
+    # Extract the tasks from shares
+    tasks = [share.task for share in shares]
+
+    return tasks
+
+
+@sharing_router.get("/{task_id}/shares", response_model=list[TaskShareResponse])
+def get_task_shares(
+    task_id: int,
+    db_session: Session = Depends(get_db),
+    current_user: db_models.User = Depends(get_current_user),
+):
+    """Get a list of users this task is shared with (owner only)"""
+
+    task = db_session.query(db_models.Task).filter(db_models.Task.id == task_id).first()
+
+    if not task:
+        raise exceptions.TaskNotFoundError(task_id=task_id)
+
+    require_task_access(task, current_user, db_session, TaskPermission.OWNER)
+
+    shares = (
+        db_session.query(db_models.TaskShare)
+        .options(joinedload(db_models.TaskShare.shared_with))
+        .filter(db_models.TaskShare.task_id == task_id)
+        .all()
+    )
+
+    return [
+        {
+            "id": share.id,
+            "task_id": share.task_id,
+            "shared_with_user_id": share.shared_with_user_id,
+            "shared_with_username": share.shared_with.username,
+            "permission": share.permission,
+            "shared_at": share.shared_at,
+        }
+        for share in shares
+    ]
 
 
 @sharing_router.post(
@@ -33,10 +88,7 @@ def share_task(
         raise exceptions.TaskNotFoundError(task_id=task_id)
 
     # Only owner can share
-    if task.user_id != current_user.id:  # type: ignore
-        raise exceptions.UnauthorizedTaskAccessError(
-            task_id=task_id, user_id=current_user.id  # type: ignore
-        )
+    require_task_access(task, current_user, db_session, TaskPermission.OWNER)
 
     # Look up user to share with
     shared_with_user = (
@@ -115,24 +167,66 @@ def share_task(
     }
 
 
-@sharing_router.get("/shared-with-me", response_model=list[Task])
-def get_shared_tasks(
+@sharing_router.put("/{task_id}/share/{username}")
+def update_share_permission(
+    task_id: int,
+    username: str,
+    share_update: TaskShareUpdate,
     db_session: Session = Depends(get_db),
     current_user: db_models.User = Depends(get_current_user),
 ):
-    """Get all tasks that have been shared with the current user"""
+    """Update permission level"""
 
-    # Query for shares where current user is the recipient
-    shares = (
-        db_session.query(db_models.TaskShare)
-        .filter(db_models.TaskShare.shared_with_user_id == current_user.id)
-        .all()
+    # Get the task
+    task = db_session.query(db_models.Task).filter(db_models.Task.id == task_id).first()
+
+    if not task:
+        raise exceptions.TaskNotFoundError(task_id=task_id)
+
+    # Only owner can unshare
+    require_task_access(task, current_user, db_session, TaskPermission.OWNER)
+
+    user = (
+        db_session.query(db_models.User)
+        .filter(db_models.User.username == username)
+        .first()
     )
 
-    # Extract the tasks from shares
-    tasks = [share.task for share in shares]
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"User '{username}' not found"
+        )
 
-    return tasks
+    # Find the share
+    share = (
+        db_session.query(db_models.TaskShare)
+        .filter(
+            db_models.TaskShare.task_id == task_id,
+            db_models.TaskShare.shared_with_user_id == user.id,
+        )
+        .first()
+    )
+
+    if not share:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task is not shared with '{username}'",
+        )
+
+    share.permission = share_update.permission  # type: ignore
+
+    # Delete the share
+    db_session.commit()
+    db_session.refresh(share)
+
+    return {
+        "id": share.id,
+        "task_id": share.task_id,
+        "shared_with_user_id": share.shared_with_user_id,
+        "shared_with_username": share.shared_with.username,  # <--- Grab it here
+        "permission": share.permission,
+        "shared_at": share.shared_at,
+    }
 
 
 @sharing_router.delete(
@@ -153,10 +247,7 @@ def unshare_task(
         raise exceptions.TaskNotFoundError(task_id=task_id)
 
     # Only owner can unshare
-    if task.user_id != current_user.id:  # type: ignore
-        raise exceptions.UnauthorizedTaskAccessError(
-            task_id=task_id, user_id=current_user.id  # type: ignore
-        )
+    require_task_access(task, current_user, db_session, TaskPermission.OWNER)
 
     # Find the share
     share = (
@@ -188,57 +279,3 @@ def unshare_task(
     # Delete the share
     db_session.delete(share)
     db_session.commit()
-
-
-@sharing_router.put("/{task_id}/share/{user_id}")
-def update_share_permission(
-    task_id: int,
-    user_id: int,
-    share_update: TaskShareUpdate,
-    db_session: Session = Depends(get_db),
-    current_user: db_models.User = Depends(get_current_user),
-):
-    """Update permission level"""
-
-    # Get the task
-    task = db_session.query(db_models.Task).filter(db_models.Task.id == task_id).first()
-
-    if not task:
-        raise exceptions.TaskNotFoundError(task_id=task_id)
-
-    # Only owner can unshare
-    if task.user_id != current_user.id:  # type: ignore
-        raise exceptions.UnauthorizedTaskAccessError(
-            task_id=task_id, user_id=current_user.id  # type: ignore
-        )
-
-    # Find the share
-    share = (
-        db_session.query(db_models.TaskShare)
-        .filter(
-            db_models.TaskShare.task_id == task_id,
-            db_models.TaskShare.shared_with_user_id == user_id,
-        )
-        .first()
-    )
-
-    if not share:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Task is not shared with this user",
-        )
-
-    share.permission = share_update.permission  # type: ignore
-
-    # Delete the share
-    db_session.commit()
-    db_session.refresh(share)
-
-    return {
-        "id": share.id,
-        "task_id": share.task_id,
-        "shared_with_user_id": share.shared_with_user_id,
-        "shared_with_username": share.shared_with.username,  # <--- Grab it here
-        "permission": share.permission,
-        "shared_at": share.shared_at,
-    }
