@@ -205,11 +205,11 @@ def test_update_share_permission(client, create_user_and_token):
     )
 
     data = share_response.json()
-    user_b_id = data["shared_with_user_id"]
+    user_b_username = data["shared_with_username"]
 
     # ACT
     update_response = client.put(
-        f"/tasks/{task_id}/share/{user_b_id}",
+        f"/tasks/{task_id}/share/{user_b_username}",
         json={"permission": "edit"},
         headers={"Authorization": f"Bearer {user_a_token}"},
     )
