@@ -7,12 +7,18 @@ import exceptions
 from background_tasks import notify_task_shared
 from db_config import get_db
 from dependencies import TaskPermission, get_current_user, require_task_access
-from models import Task, TaskShareCreate, TaskShareResponse, TaskShareUpdate
+from models import (
+    SharedTaskResponse,
+    Task,
+    TaskShareCreate,
+    TaskShareResponse,
+    TaskShareUpdate,
+)
 
 sharing_router = APIRouter(prefix="/tasks", tags=["sharing"])
 
 
-@sharing_router.get("/shared-with-me", response_model=list[Task])
+@sharing_router.get("/shared-with-me", response_model=list[SharedTaskResponse])
 def get_shared_tasks(
     db_session: Session = Depends(get_db),
     current_user: db_models.User = Depends(get_current_user),
@@ -22,14 +28,19 @@ def get_shared_tasks(
     # Query for shares where current user is the recipient
     shares = (
         db_session.query(db_models.TaskShare)
+        .options(joinedload(db_models.TaskShare.task))
         .filter(db_models.TaskShare.shared_with_user_id == current_user.id)
         .all()
     )
 
-    # Extract the tasks from shares
-    tasks = [share.task for share in shares]
-
-    return tasks
+    return [
+        {
+            "task": share.task,  # The full task object
+            "permission": share.permission,  # "view" or "edit"
+            "is_owner": False,  # Always false for "shared with me"
+        }
+        for share in shares
+    ]
 
 
 @sharing_router.get("/{task_id}/shares", response_model=list[TaskShareResponse])
