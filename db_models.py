@@ -153,9 +153,9 @@ class NotificationPreference(Base):
 
     # Granular Preferences (Defaults to True)
     task_shared_with_me = Column(Boolean, default=True)
-    task_completed = Column(Boolean, default=True)
+    task_completed = Column(Boolean, default=False)
     comment_on_my_task = Column(Boolean, default=True)
-    task_due_soon = Column(Boolean, default=False)
+    task_due_soon = Column(Boolean, default=True)
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
