@@ -130,45 +130,54 @@ def get_task_timeline(
     db_session: Session = Depends(get_db),
     current_user: db_models.User = Depends(get_current_user),
 ):
-    """
-    Get complete activity timeline for a specific task.
+    """Get complete activity timeline for a specific task"""
 
-    Shows all actions performed on this task (create, updates, shares, etc.)
-    Only return logs if user has access to the task.
-    """
-    # Get task
+    # Check task exists and user has access
     task = db_session.query(db_models.Task).filter(db_models.Task.id == task_id).first()
 
     if not task:
         raise TaskNotFoundError(task_id=task_id)
 
-    # Check permission
     require_task_access(task, current_user, db_session, TaskPermission.VIEW)
 
-    # Get all activity for this task
-    logs = (
+    # Get ALL activities that might be related
+    # We'll filter in Python - simpler and more readable
+    all_logs = (
         db_session.query(db_models.ActivityLog)
         .options(joinedload(db_models.ActivityLog.user))
-        .filter(
-            db_models.ActivityLog.resource_type == "task",
-            db_models.ActivityLog.resource_id == task_id,
-        )
         .order_by(db_models.ActivityLog.created_at)
         .all()
     )
 
-    # Convert to response
+    # Filter for this task in Python
+    task_logs = []
+    for log in all_logs:
+        # Check if this activity is related to our task
+        is_related = False
+
+        # Direct task activity
+        if log.resource_type == "task" and log.resource_id == task_id:  # type: ignore
+            is_related = True
+
+        # Comment/file activity (check details.task_id)
+        elif log.details and log.details.get("task_id") == task_id:  # type: ignore
+            is_related = True
+
+        if is_related:
+            task_logs.append(log)
+
+    # Convert to response model
     results = []
-    for log in logs:
+    for log in task_logs:
         results.append(
             ActivityLogResponse(
-                id=log.id,  # type: ignore
-                user_id=log.user_id,  # type: ignore
-                action=log.action,  # type: ignore
-                resource_type=log.resource_type,  # type: ignore
-                resource_id=log.resource_id,  # type: ignore
-                details=log.details,  # type: ignore
-                created_at=log.created_at,  # type: ignore
+                id=log.id,
+                user_id=log.user_id,
+                action=log.action,
+                resource_type=log.resource_type,
+                resource_id=log.resource_id,
+                details=log.details,
+                created_at=log.created_at,
                 username=log.user.username if log.user else None,
             )
         )
