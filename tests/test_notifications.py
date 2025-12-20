@@ -3,6 +3,29 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import status
 
+import db_models
+from notifications import get_or_create_preferences
+
+
+def mark_email_verified(db_session, username):
+    """Mark a user's email as verified in notification preferences."""
+    # Look up user
+    user = (
+        db_session.query(db_models.User)
+        .filter(db_models.User.username == username)
+        .first()
+    )
+
+    if not user:
+        raise ValueError(f"User {username} not found")
+
+    # Get or create preferences
+    prefs = get_or_create_preferences(user.id, db_session)
+
+    # Mark as verified
+    prefs.email_verified = True  # type: ignore
+    db_session.commit()
+
 
 @pytest.fixture
 def mock_sns():
@@ -42,7 +65,7 @@ def test_notification_preferences(authenticated_client):
     assert data["email_enabled"] is True
 
 
-def test_notification_lifecycle(client, create_user_and_token, mock_sns):
+def test_notification_lifecycle(client, db_session, create_user_and_token, mock_sns):
     # Bob's email is verified
     # Alice shares task with bob
     # Assert that sns_client is called when sharing task
@@ -60,11 +83,7 @@ def test_notification_lifecycle(client, create_user_and_token, mock_sns):
 
     task_id = response.json()["id"]
 
-    # Bob verifies email
-    verify_response = client.post(
-        "notifications/verify", headers={"Authorization": f"Bearer {user_b_token}"}
-    )
-    assert verify_response.status_code == status.HTTP_200_OK
+    mark_email_verified(db_session, "Bob")
 
     # Alice shares task with Bob
     response = client.post(
@@ -77,16 +96,14 @@ def test_notification_lifecycle(client, create_user_and_token, mock_sns):
     mock_sns.publish.assert_called_once()
 
 
-def test_comment_notification(client, create_user_and_token, mock_sns):
+def test_comment_notification(client, db_session, create_user_and_token, mock_sns):
     """Test that task owner gets notified when someone comments"""
     # ARRANGE
     user_a_token = create_user_and_token("Alice", "usera@test.com", "password123")
     user_b_token = create_user_and_token("Bob", "userb@test.com", "password456")
 
     # Alice verifies email
-    client.post(
-        "notifications/verify", headers={"Authorization": f"Bearer {user_a_token}"}
-    )
+    mark_email_verified(db_session, "Alice")
 
     # Alice creates task
     task = client.post(
@@ -122,16 +139,14 @@ def test_comment_notification(client, create_user_and_token, mock_sns):
     assert "Bob" in call_args.kwargs["Message"]
 
 
-def test_completed_notification(client, create_user_and_token, mock_sns):
+def test_completed_notification(client, db_session, create_user_and_token, mock_sns):
     """Test that task owner gets notified when someone marks their task completed"""
     # ARRANGE
     user_a_token = create_user_and_token("Alice", "usera@test.com", "password123")
     user_b_token = create_user_and_token("Bob", "userb@test.com", "password456")
 
     # Alice verifies email
-    client.post(
-        "notifications/verify", headers={"Authorization": f"Bearer {user_a_token}"}
-    )
+    mark_email_verified(db_session, "Alice")
 
     # Alice enables task completed notification
     response = client.patch(

@@ -23,6 +23,13 @@ sns_client = boto3.client(
     aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
 )
 
+ses_client = boto3.client(
+    "ses",
+    region_name=AWS_REGION,
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+)
+
 
 class NotificationType:
     """Enum for notification event types"""
@@ -31,6 +38,53 @@ class NotificationType:
     TASK_COMPLETED = "task_completed"
     COMMENT_ADDED = "comment_added"
     TASK_DUE_SOON = "task_due_soon"
+
+
+def send_direct_email(
+    recipient_email: str, subject: str, body_text: str, body_html: str = None  # type: ignore
+) -> bool:
+    """
+    Send email directly via SES
+    User for emails like verifications, password reset.
+
+    Returns True if successful.
+    """
+
+    sender_email = "faros@odysian.dev"
+
+    try:
+        # Build email
+        message = {"Subject": {"Data": subject}, "Body": {}}
+
+        if body_text:
+            message["Body"]["Text"] = {"Data": body_text}
+
+        if body_html:
+            message["Body"]["Html"] = {"Data": body_html}
+
+        response = ses_client.send_email(
+            Source=sender_email,
+            Destination={"ToAddresses": [recipient_email]},
+            Message=message,
+        )
+
+        logger.info(
+            f"Direct email sent to {recipient_email}, "
+            f"MessageId: {response['MessageId']}"
+        )
+        return True
+
+    except ClientError as e:
+        error_code = e.response["Error"]["Code"]
+
+        if error_code == "MessageRejected":
+            logger.error(f"Email rejected: {recipient_email} - {e}")
+        elif error_code == "MailFromDomainNotVerified":
+            logger.error(f"Sender domain not verified in SES: {sender_email}")
+        else:
+            logger.error(f"Failed to send email: {e}")
+
+        return False
 
 
 def get_or_create_preferences(

@@ -100,6 +100,7 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
     openapi_tags=tags_metadata,
+    swagger_ui_parameters={"persistAuthorization": True},
 )
 
 app.add_middleware(
