@@ -8,4 +8,5 @@ logs/
 uploads/
 .env.docker
 .vscode/
-docs/interview.md
+docs/
+
