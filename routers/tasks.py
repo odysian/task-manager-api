@@ -14,6 +14,7 @@ from fastapi import (
     Request,
     status,
 )
+from sqlalchemy import distinct, func
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -217,9 +218,9 @@ def get_task_stats(
     )
 
     tasks_shared = (
-        db_session.query(db_models.TaskShare)
+        db_session.query(func.count(distinct(db_models.TaskShare.task_id)))
         .filter(db_models.TaskShare.shared_by_user_id == current_user.id)
-        .count()
+        .scalar()
     )
 
     comments_posted = (
