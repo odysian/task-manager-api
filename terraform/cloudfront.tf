@@ -55,6 +55,8 @@ resource "aws_cloudfront_distribution" "frontend" {
     response_page_path = "/index.html"
   }
 
+  depends_on = [aws_acm_certificate_validation.frontend]
+
   tags = {
     Name = "${var.project_name}-frontend-cdn"
   }

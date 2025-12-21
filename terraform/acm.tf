@@ -13,6 +13,12 @@ resource "aws_acm_certificate" "frontend" {
   }
 }
 
+resource "aws_acm_certificate_validation" "frontend" {
+  provider = aws.us_east_1
+
+  certificate_arn = aws_acm_certificate.frontend.arn
+}
+
 output "certficate_validation_records" {
   description = "DNS records to add in Cloudflare for certificate validation"
   value = {
