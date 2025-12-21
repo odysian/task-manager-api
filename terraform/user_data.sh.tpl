@@ -3,6 +3,7 @@ set -e
 exec > >(tee /var/log/user-data.log)
 exec 2>&1
 
+# Force update: 2024-12-21
 echo "=== Starting Task Manager API Setup ==="
 
 # ============================================

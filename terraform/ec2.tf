@@ -6,6 +6,7 @@ resource "aws_instance" "api" {
   associate_public_ip_address = true
   subnet_id                   = data.aws_subnets.default.ids[0]
   iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
+  user_data_replace_on_change = true
   user_data = base64encode(templatefile("${path.module}/user_data.sh.tpl", {
     github_repo           = var.github_repo
     secret_key            = var.secret_key
