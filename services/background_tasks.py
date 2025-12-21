@@ -1,18 +1,19 @@
 import logging
 import os
 import time
-from datetime import datetime
-from pathlib import Path
 
 import boto3
 from botocore.exceptions import ClientError
-from sqlalchemy.orm import Session
 
 from db_config import SessionLocal
-from notifications import (NotificationType, format_comment_added_notification,
-                           format_task_completed_notification,
-                           format_task_shared_notification, send_notification,
-                           should_notify)
+from services.notifications import (
+    NotificationType,
+    format_comment_added_notification,
+    format_task_completed_notification,
+    format_task_shared_notification,
+    send_notification,
+    should_notify,
+)
 
 logger = logging.getLogger(__name__)
 

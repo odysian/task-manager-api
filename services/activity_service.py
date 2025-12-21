@@ -5,7 +5,7 @@ from typing import Any, Optional, cast
 from sqlalchemy.orm import Session
 
 import db_models
-from models import ActivityLogCreate
+from schemas.activity import ActivityLogCreate
 
 
 def log_activity(

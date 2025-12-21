@@ -173,5 +173,7 @@ def patch_background_tasks_db(db_session):
     def test_session_factory():
         return TestSessionLocal()
 
-    with patch("background_tasks.SessionLocal", side_effect=test_session_factory):
+    with patch(
+        "services.background_tasks.SessionLocal", side_effect=test_session_factory
+    ):
         yield

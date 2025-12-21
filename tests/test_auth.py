@@ -10,7 +10,7 @@ import db_models
 @pytest.fixture
 def mock_ses():
     """Mock SES Client for email sending."""
-    with patch("notifications.ses_client") as mock:
+    with patch("services.notifications.ses_client") as mock:
         mock.send_email.return_value = {"MessageId": "test-123"}
         yield mock
 

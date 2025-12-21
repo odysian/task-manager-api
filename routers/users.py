@@ -4,10 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 import db_models
-from auth import hash_password, verify_password
+from core.security import hash_password, verify_password
 from db_config import get_db
 from dependencies import get_current_user
-from models import PasswordChange, UserProfile
+from schemas.auth import PasswordChange, UserProfile
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -33,7 +33,7 @@ def change_password(
     if not verify_password(
         password_data.current_password, current_user.hashed_password  # type: ignore
     ):
-        logger.warning(f"Password change failed: Current password incorrect.")
+        logger.warning("Password change failed: Current password incorrect.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Current password is incorrect",

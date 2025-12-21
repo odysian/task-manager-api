@@ -6,9 +6,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 import db_models
-from auth import verify_access_token
+from core.exceptions import UnauthorizedTaskAccessError
+from core.security import verify_access_token
 from db_config import get_db
-from exceptions import UnauthorizedTaskAccessError
 
 
 # Custom HTTPBearer that raises 401 instead of 403

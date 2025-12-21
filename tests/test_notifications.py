@@ -4,7 +4,7 @@ import pytest
 from fastapi import status
 
 import db_models
-from notifications import get_or_create_preferences
+from services.notifications import get_or_create_preferences
 
 
 def mark_email_verified(db_session, username):
@@ -33,7 +33,7 @@ def mock_sns():
     Replaces the actual AWS connection with a 'spy' object.
     """
     # Verify this string matches your file structure!
-    with patch("notifications.sns_client") as mock:
+    with patch("services.notifications.sns_client") as mock:
         mock.publish.return_value = {"MessageId": "test-123"}
         mock.subscribe.return_value = {"SubscriptionArn": "arn:test:123"}
         yield mock

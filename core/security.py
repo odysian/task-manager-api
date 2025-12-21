@@ -1,4 +1,3 @@
-import logging
 import os
 from datetime import datetime, timedelta, timezone
 
@@ -16,7 +15,7 @@ if not _algorithm:
 
 SECRET_KEY: str = _secret_key
 ALGORITHM: str = _algorithm
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 720))
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "720"))
 
 
 # Configure bcrypt for password hashing

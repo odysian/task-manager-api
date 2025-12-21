@@ -5,10 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 import db_models
-import exceptions
-from auth import create_access_token, hash_password, verify_password
+from core import exceptions
+from core.rate_limit_config import limiter
+from core.security import create_access_token, hash_password, verify_password
+from core.tokens import generate_token, verify_token_expiration
 from db_config import get_db
-from models import (
+from schemas.auth import (
     PasswordResetComplete,
     PasswordResetRequest,
     Token,
@@ -16,9 +18,7 @@ from models import (
     UserLogin,
     UserResponse,
 )
-from notifications import send_direct_email
-from rate_limit_config import limiter
-from tokens import generate_token, verify_token_expiration
+from services.notifications import send_direct_email
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
@@ -185,7 +185,7 @@ FAROS Task Manager
     <h2>Password Reset Request</h2>
     <p>We received a request to reset the password for your FAROS account.</p>
     <p>
-        <a href="{reset_url}" 
+        <a href="{reset_url}"
            style="background-color: #10b981; color: white; padding: 12px 24px; 
                   text-decoration: none; border-radius: 6px; display: inline-block;">
             Reset Password

@@ -8,10 +8,10 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session, joinedload
 
 import db_models
+from core.exceptions import TaskNotFoundError
 from db_config import get_db
 from dependencies import TaskPermission, get_current_user, require_task_access
-from exceptions import TaskNotFoundError
-from models import ActivityLogResponse
+from schemas.activity import ActivityLogResponse
 
 router = APIRouter(prefix="/activity", tags=["activity"])
 

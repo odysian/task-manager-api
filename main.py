@@ -12,8 +12,8 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-import exceptions
-from logging_config import setup_logging
+import core.exceptions as exceptions
+from core.logging_config import setup_logging
 from routers import (
     activity,
     auth,
@@ -46,7 +46,7 @@ if not TESTING:
     from slowapi import _rate_limit_exceeded_handler
     from slowapi.errors import RateLimitExceeded
 
-    from rate_limit_config import limiter
+    from core.rate_limit_config import limiter
 
 # --- Application Setup ---
 

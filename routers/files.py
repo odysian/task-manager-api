@@ -6,18 +6,17 @@ from pathlib import Path
 
 import boto3
 from botocore.exceptions import ClientError
-from fastapi import (APIRouter, Depends, File, HTTPException, Request,
-                     UploadFile, status)
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-import activity_service
 import db_models
-import exceptions
+from core import exceptions
+from core.rate_limit_config import limiter
 from db_config import get_db
 from dependencies import TaskPermission, get_current_user, require_task_access
-from models import FileUploadResponse, TaskFileInfo
-from rate_limit_config import limiter
+from schemas.file import FileUploadResponse, TaskFileInfo
+from services import activity_service
 
 # AWS S3 Configuration
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")

@@ -1,5 +1,6 @@
 import logging
 import os
+import urllib.parse
 from typing import Optional
 
 import redis
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 # Parse the Redis URL to extract host, port, and database number
-import urllib.parse
+
 
 parsed = urllib.parse.urlparse(REDIS_URL)
 
@@ -24,7 +25,7 @@ STATS_CACHE_TTL = 300
 
 # Create Redis client
 try:
-    redis_client = redis.Redis(
+    redis_client = redis.Redis(  # pylint: disable=invalid-name
         host=REDIS_HOST,
         port=REDIS_PORT,
         db=REDIS_DB,

@@ -3,14 +3,14 @@ import logging
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
-import activity_service
 import db_models
-import exceptions
-from background_tasks import notify_comment_added
+from core import exceptions
+from core.redis_config import invalidate_user_cache
 from db_config import get_db
 from dependencies import TaskPermission, get_current_user, require_task_access
-from models import Comment, CommentCreate, CommentUpdate
-from redis_config import invalidate_user_cache
+from schemas.comment import Comment, CommentCreate, CommentUpdate
+from services import activity_service
+from services.background_tasks import notify_comment_added
 
 task_comments_router = APIRouter(prefix="/tasks", tags=["comments"])
 comments_router = APIRouter(prefix="/comments", tags=["comments"])

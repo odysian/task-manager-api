@@ -18,13 +18,13 @@ from sqlalchemy import distinct, func
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.orm.attributes import flag_modified
 
-import activity_service
 import db_models
-import exceptions
-from background_tasks import cleanup_after_task_deletion, notify_task_completed
+from core import exceptions
+from core.rate_limit_config import limiter
+from core.redis_config import get_cache, invalidate_user_cache, set_cache
 from db_config import get_db
 from dependencies import TaskPermission, get_current_user, require_task_access
-from models import (
+from schemas.task import (
     BulkTaskUpdate,
     PaginatedTasks,
     Task,
@@ -32,8 +32,8 @@ from models import (
     TaskStats,
     TaskUpdate,
 )
-from rate_limit_config import limiter
-from redis_config import get_cache, invalidate_user_cache, set_cache
+from services import activity_service
+from services.background_tasks import cleanup_after_task_deletion, notify_task_completed
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 logger = logging.getLogger(__name__)

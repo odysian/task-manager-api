@@ -1,20 +1,19 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
-import activity_service
 import db_models
-import exceptions
-from background_tasks import notify_task_shared
+from core import exceptions
+from core.redis_config import invalidate_user_cache
 from db_config import get_db
 from dependencies import TaskPermission, get_current_user, require_task_access
-from models import (
+from schemas.sharing import (
     SharedTaskResponse,
-    Task,
     TaskShareCreate,
     TaskShareResponse,
     TaskShareUpdate,
 )
-from redis_config import invalidate_user_cache
+from services import activity_service
+from services.background_tasks import notify_task_shared
 
 sharing_router = APIRouter(prefix="/tasks", tags=["sharing"])
 

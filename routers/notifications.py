@@ -1,27 +1,23 @@
 import logging
 import os
-import secrets
-from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 import db_models
+from core.tokens import generate_token, verify_token_expiration
 from db_config import get_db
 from dependencies import get_current_user
-from models import (
+from schemas.auth import VerifyEmailRequest
+from schemas.notification import (
     NotificationPreferenceResponse,
     NotificationPreferenceUpdate,
-    VerifyEmailRequest,
 )
-from notifications import (
-    NotificationType,
+from services.notifications import (
     get_or_create_preferences,
     send_direct_email,
-    send_notification,
     subscribe_user_to_notifications,
 )
-from tokens import generate_token, verify_token_expiration
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
@@ -177,7 +173,7 @@ FAROS Task Manager
     <h2>Hi {current_user.username},</h2>
     <p>Please verify your email address to enable notifications.</p>
     <p>
-        <a href="{verification_url}" 
+        <a href="{verification_url}"
            style="background-color: #10b981; color: white; padding: 12px 24px; 
                   text-decoration: none; border-radius: 6px; display: inline-block;">
             Verify Email
