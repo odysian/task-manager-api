@@ -14,6 +14,7 @@ from models import (
     TaskShareResponse,
     TaskShareUpdate,
 )
+from redis_config import invalidate_user_cache
 
 sharing_router = APIRouter(prefix="/tasks", tags=["sharing"])
 
@@ -169,6 +170,8 @@ def share_task(
         permission=share_data.permission,
     )
 
+    invalidate_user_cache(current_user.id)  # type: ignore
+
     return {
         "id": share.id,
         "task_id": share.task_id,
@@ -195,7 +198,7 @@ def update_share_permission(
     if not task:
         raise exceptions.TaskNotFoundError(task_id=task_id)
 
-    # Only owner can unshare
+    # Only owner can update share permission
     require_task_access(task, current_user, db_session, TaskPermission.OWNER)
 
     user = (
@@ -227,7 +230,7 @@ def update_share_permission(
 
     share.permission = share_update.permission  # type: ignore
 
-    # Delete the share
+    # Update the share
     db_session.commit()
     db_session.refresh(share)
 
@@ -235,7 +238,7 @@ def update_share_permission(
         "id": share.id,
         "task_id": share.task_id,
         "shared_with_user_id": share.shared_with_user_id,
-        "shared_with_username": share.shared_with.username,  # <--- Grab it here
+        "shared_with_username": share.shared_with.username,
         "permission": share.permission,
         "shared_at": share.shared_at,
     }
@@ -291,3 +294,5 @@ def unshare_task(
     # Delete the share
     db_session.delete(share)
     db_session.commit()
+
+    invalidate_user_cache(current_user.id)  # type: ignore

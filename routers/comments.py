@@ -10,6 +10,7 @@ from background_tasks import notify_comment_added
 from db_config import get_db
 from dependencies import TaskPermission, get_current_user, require_task_access
 from models import Comment, CommentCreate, CommentUpdate
+from redis_config import invalidate_user_cache
 
 task_comments_router = APIRouter(prefix="/tasks", tags=["comments"])
 comments_router = APIRouter(prefix="/comments", tags=["comments"])
@@ -60,6 +61,8 @@ def add_comment(
             commenter_username=current_user.username,  # type:ignore
             comment_content=comment_data.content,
         )
+
+    invalidate_user_cache(current_user.id)  # type: ignore
 
     logger.info(f"Successfully added comment_id={comment.id} for task_id={task_id}")
     return {
@@ -222,5 +225,7 @@ def delete_comment(
     )
     db_session.delete(comment)
     db_session.commit()
+
+    invalidate_user_cache(current_user.id)  # type: ignore
 
     logger.info(f"Comment deleted successfully: comment_id={comment_id}")

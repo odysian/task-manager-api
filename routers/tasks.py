@@ -216,6 +216,18 @@ def get_task_stats(
         and t.due_date < today
     )
 
+    tasks_shared = (
+        db_session.query(db_models.TaskShare)
+        .filter(db_models.TaskShare.shared_by_user_id == current_user.id)
+        .count()
+    )
+
+    comments_posted = (
+        db_session.query(db_models.TaskComment)
+        .filter(db_models.TaskComment.user_id == current_user.id)
+        .count()
+    )
+
     logger.info(f"Successfully retrieved task statistics for user_id={current_user.id}")
 
     stats_dict = {
@@ -225,6 +237,8 @@ def get_task_stats(
         "by_priority": dict(by_priority),
         "by_tag": dict(by_tag),
         "overdue": overdue,
+        "tasks_shared": tasks_shared,
+        "comments_posted": comments_posted,
     }
 
     # Store in cache for next time

@@ -69,6 +69,8 @@ class TaskStats(BaseModel):
     by_priority: dict[str, int]
     by_tag: dict[str, int]
     overdue: int
+    tasks_shared: int = 0
+    comments_posted: int = 0
 
 
 class BulkTaskUpdate(BaseModel):
