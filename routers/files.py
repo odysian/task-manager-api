@@ -4,7 +4,6 @@ import uuid
 from io import BytesIO
 from pathlib import Path
 
-import boto3
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -13,24 +12,11 @@ from sqlalchemy.orm import Session
 import db_models
 from core import exceptions
 from core.rate_limit_config import limiter
+from core.storage import S3_BUCKET_NAME, s3_client
 from db_config import get_db
 from dependencies import TaskPermission, get_current_user, require_task_access
 from schemas.file import FileUploadResponse, TaskFileInfo
 from services import activity_service
-
-# AWS S3 Configuration
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-
-# Create S3 Client
-s3_client = boto3.client(
-    "s3",
-    region_name=AWS_REGION,
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-)
 
 # Router for task-related file endpoints
 task_files_router = APIRouter(prefix="/tasks", tags=["files"])
