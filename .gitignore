@@ -10,4 +10,5 @@ uploads/
 .vscode/
 docs/architecture/
 docs/guides
+docs/debug.md
 
