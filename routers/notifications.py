@@ -9,7 +9,10 @@ from core.tokens import generate_token, verify_token_expiration
 from db_config import get_db
 from dependencies import get_current_user
 from schemas.auth import VerifyEmailRequest
-from schemas.notification import NotificationPreferenceResponse, NotificationPreferenceUpdate
+from schemas.notification import (
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdate,
+)
 from services.notifications import (
     get_or_create_preferences,
     send_direct_email,
@@ -130,11 +133,12 @@ def verify_email_get(
 
     user = _verify_email_token(token, db_session)
 
-    # Redirect to frontend success page
+    # Redirect to frontend - email is already verified by this GET endpoint
+    # Redirect to login with success message (frontend can show toast/notification)
     from fastapi.responses import RedirectResponse
 
     return RedirectResponse(
-        url=f"{FRONTEND_URL}/verify-success?username={user.username}",
+        url=f"{FRONTEND_URL}/login?emailVerified=true&username={user.username}",
         status_code=status.HTTP_302_FOUND,
     )
 
@@ -177,12 +181,9 @@ def send_verification_email(
     current_user.verification_expires = expires_at  # type: ignore
     db_session.commit()
 
-    # Build verification URL - point to backend endpoint which will redirect to frontend
-    # This allows direct clicks from email to work without requiring frontend route
-    API_URL = os.getenv(
-        "API_URL", os.getenv("BACKEND_URL", "https://faros-api.onrender.com")
-    )
-    verification_url = f"{API_URL}/notifications/verify?token={token}"
+    # Build verification URL - point directly to frontend
+    # Frontend will handle the verification via POST to /notifications/verify
+    verification_url = f"{FRONTEND_URL}/verify?token={token}"
 
     # Email content
     subject = "Verify your FAROS email address"
