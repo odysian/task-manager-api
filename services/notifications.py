@@ -2,33 +2,12 @@ import logging
 import os
 from typing import Optional
 
-import boto3
-from botocore.exceptions import ClientError
 from sqlalchemy.orm import Session
 
 import db_models
+from core.email import email_service
 
 logger = logging.getLogger(__name__)
-
-# AWS SNS Config
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-SNS_TOPIC_ARN = os.getenv("SNS_TOPIC_ARN")
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-
-sns_client = boto3.client(
-    "sns",
-    region_name=AWS_REGION,
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-)
-
-ses_client = boto3.client(
-    "ses",
-    region_name=AWS_REGION,
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-)
 
 
 class NotificationType:
@@ -44,47 +23,17 @@ def send_direct_email(
     recipient_email: str, subject: str, body_text: str, body_html: str = None  # type: ignore
 ) -> bool:
     """
-    Send email directly via SES
-    User for emails like verifications, password reset.
+    Send email directly via email service (Resend or AWS SES).
+    Used for emails like verifications, password reset.
 
     Returns True if successful.
     """
-
-    sender_email = "faros@odysian.dev"
-
-    try:
-        # Build email
-        message = {"Subject": {"Data": subject}, "Body": {}}
-
-        if body_text:
-            message["Body"]["Text"] = {"Data": body_text}
-
-        if body_html:
-            message["Body"]["Html"] = {"Data": body_html}
-
-        response = ses_client.send_email(
-            Source=sender_email,
-            Destination={"ToAddresses": [recipient_email]},
-            Message=message,
-        )
-
-        logger.info(
-            f"Direct email sent to {recipient_email}, "
-            f"MessageId: {response['MessageId']}"
-        )
-        return True
-
-    except ClientError as e:
-        error_code = e.response["Error"]["Code"]
-
-        if error_code == "MessageRejected":
-            logger.error(f"Email rejected: {recipient_email} - {e}")
-        elif error_code == "MailFromDomainNotVerified":
-            logger.error(f"Sender domain not verified in SES: {sender_email}")
-        else:
-            logger.error(f"Failed to send email: {e}")
-
-        return False
+    return email_service.send_email(
+        recipient_email=recipient_email,
+        subject=subject,
+        body_text=body_text,
+        body_html=body_html,
+    )
 
 
 def get_or_create_preferences(
@@ -152,67 +101,40 @@ def send_notification(
     recipient_email: str, subject: str, message: str, notification_type: str
 ) -> bool:
     """
-    Send notification via SNS.
+    Send notification via email service (Resend or AWS SES).
     Returns True if successful, False otherwise.
+
+    Note: With Resend, we send directly. With AWS, this could use SNS if configured,
+    but for simplicity we use direct email for both.
     """
-    if not SNS_TOPIC_ARN:
-        logger.error("SNS_TOPIC_ARN not configured")
-        return False
+    logger.info(
+        f"Sending notification: type={notification_type}, recipient={recipient_email}"
+    )
 
-    try:
-        # Publish to the topic with Message Attributes
-        # This allows us to filter who receives it using Subscription Filter Policies
-        response = sns_client.publish(
-            TopicArn=SNS_TOPIC_ARN,
-            Subject=subject,
-            Message=message,
-            MessageAttributes={
-                "notification_type": {
-                    "DataType": "String",
-                    "StringValue": notification_type,
-                },
-                "recipient": {"DataType": "String", "StringValue": recipient_email},
-            },
-        )
-
-        logger.info(
-            f"Notification sent: type={notification_type}, "
-            f"recipient={recipient_email}, message_id={response['MessageId']}"
-        )
-        return True
-
-    except ClientError as e:
-        logger.error(f"Failed to send notification: {e}")
-        return False
+    # Send as plain text email (can be enhanced with HTML templates later)
+    return email_service.send_email(
+        recipient_email=recipient_email,
+        subject=subject,
+        body_text=message,
+        body_html=None,  # Can add HTML templates later
+    )
 
 
 def subscribe_user_to_notifications(user_email: str) -> Optional[str]:
     """
-    Subscribe a user's email to the SNS topic.
-    AWS will send a confirmation email.
+    Subscribe a user's email to notifications.
+
+    With Resend: No subscription needed - emails are sent directly.
+    With AWS SNS: Would subscribe to topic (not implemented for simplicity).
+
+    Returns a subscription identifier if applicable, None otherwise.
     """
-    if not SNS_TOPIC_ARN:
-        logger.error("SNS_TOPIC_ARN not configured")
-        return None
-
-    try:
-        # In production, we would add a filter policy here
-        # so users ONLY get messages where recipient == their email.
-        # For now, we subscribe generically.
-        response = sns_client.subscribe(
-            TopicArn=SNS_TOPIC_ARN,
-            Protocol="email",
-            Endpoint=user_email,
-            ReturnSubscriptionArn=True,
-        )
-
-        subscription_arn = response.get("SubscriptionArn")
-        logger.info(f"Subscribed {user_email} to notifications: {subscription_arn}")
-        return subscription_arn
-
-    except ClientError as e:
-        logger.error(f"Failed to subscribe {user_email}: {e}")
-        return None
+    # With Resend, no subscription is needed - emails are sent directly
+    # This function is kept for API compatibility but doesn't do anything
+    logger.info(
+        f"User {user_email} is ready to receive notifications (no subscription needed with current email provider)"
+    )
+    return "subscribed"  # Return a dummy value for compatibility
 
 
 # --- Message Templates ---
