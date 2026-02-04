@@ -107,6 +107,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "http://localhost:5174",
         "https://faros.odysian.dev",
         "https://d1owe5rp9qba94.cloudfront.net",
     ],
