@@ -1,8 +1,7 @@
 import logging
 import os
+from pathlib import Path
 
-import boto3
-from botocore.exceptions import ClientError
 from fastapi import (
     APIRouter,
     Depends,
@@ -13,12 +12,12 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 import db_models
 from core.security import hash_password, verify_password
-from core.storage import S3_BUCKET_NAME, s3_client
+from core.storage import get_file_path, storage
 from db_config import get_db
 from dependencies import get_current_user
 from schemas.auth import PasswordChange, UserProfile
@@ -47,23 +46,26 @@ async def upload_avatar(
             status_code=status.HTTP_400_BAD_REQUEST, detail="File must be an image"
         )
 
-    file_ext = file.filename.split(".")[-1]  # type: ignore
-    s3_key = f"avatars/user_{current_user.id}_avatar.{file_ext}"
+    file_ext = Path(file.filename).suffix.lower()  # type: ignore
+    stored_filename = f"avatars/user_{current_user.id}_avatar{file_ext}"
+
+    # Save avatar using storage abstraction
+    content = await file.read()
 
     try:
-        s3_client.put_object(
-            Bucket=S3_BUCKET_NAME,
-            Key=s3_key,
-            Body=await file.read(),
-            ContentType=file.content_type,
+        storage.upload_file(
+            stored_filename=stored_filename,
+            content=content,
+            content_type=file.content_type or "image/jpeg",
         )
-    except ClientError as e:
+    except Exception as e:
+        logger.error(f"Avatar upload failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to upload avatar",
-        )
+        ) from e
 
-    avatar_url = f"/users/{current_user.id}/avatar.{file_ext}"
+    avatar_url = f"/users/{current_user.id}/avatar{file_ext}"
 
     current_user.avatar_url = avatar_url  # type: ignore
     db_session.commit()
@@ -140,7 +142,7 @@ def search_users(
 
 @router.get("/{user_id}/avatar.{ext}")
 def get_user_avatar(user_id: int, ext: str, db_session: Session = Depends(get_db)):
-    """Stream the avatar image from S3"""
+    """Stream the avatar image from storage"""
 
     user = db_session.query(db_models.User).filter(db_models.User.id == user_id).first()
 
@@ -149,10 +151,35 @@ def get_user_avatar(user_id: int, ext: str, db_session: Session = Depends(get_db
             status_code=status.HTTP_404_NOT_FOUND, detail="Avatar not found"
         )
 
-    s3_key = f"avatars/user_{user_id}_avatar.{ext}"
+    stored_filename = f"avatars/user_{user_id}_avatar.{ext}"
 
+    # Determine content type from extension
+    content_type_map = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+    }
+    content_type = content_type_map.get(ext.lower(), "image/jpeg")
+
+    # Download and serve avatar using storage abstraction
     try:
-        response = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=s3_key)
-        return StreamingResponse(response["Body"], media_type=response["ContentType"])
-    except ClientError:
-        raise HTTPException(404, "Avatar not found")
+        from io import BytesIO
+
+        from core.storage import LocalStorage
+
+        file_content = storage.download_file(stored_filename)
+
+        # For local storage, use FileResponse for efficiency
+        if isinstance(storage, LocalStorage):
+            file_path = storage.get_file_path(stored_filename)
+            return FileResponse(path=str(file_path), media_type=content_type)
+        else:
+            # S3 storage - stream the bytes
+            file_stream = BytesIO(file_content)
+            return StreamingResponse(file_stream, media_type=content_type)
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Avatar not found"
+        )

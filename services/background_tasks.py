@@ -2,9 +2,7 @@ import logging
 import os
 import time
 
-import boto3
-from botocore.exceptions import ClientError
-
+from core.storage import storage
 from db_config import SessionLocal
 from services.notifications import (
     NotificationType,
@@ -17,39 +15,25 @@ from services.notifications import (
 
 logger = logging.getLogger(__name__)
 
-# AWS S3 Configuration
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-
-# Create S3 client
-s3_client = boto3.client(
-    "s3",
-    region_name=AWS_REGION,
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-)
-
 
 def cleanup_after_task_deletion(task_id: int, task_title: str, file_list: list[str]):
     """
     Cleanup operations after task deletion
-    In Production: delete uploaded files from S3, remove from caches, update analytics, etc.
+    Deletes uploaded files from local storage, removes from caches, updates analytics, etc.
     """
     logger.info(
         f"BACKGROUND TASK: Starting cleanup after task deletion - task_id={task_id}"
     )
 
-    # Delete files from disk
+    # Delete files using storage abstraction
     files_deleted = 0
     for stored_filename in file_list:
         try:
-            s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=stored_filename)
+            storage.delete_file(stored_filename)
             files_deleted += 1
-            logger.info(f"Deleted file from S3: {stored_filename}")
-        except ClientError as e:
-            logger.warning(f"S3 deletion warning for {stored_filename}: {e}")
+            logger.info(f"Deleted file from storage: {stored_filename}")
+        except Exception as e:
+            logger.warning(f"File deletion warning for {stored_filename}: {e}")
 
     # Simulate cleanup work
     time.sleep(1)
@@ -57,7 +41,7 @@ def cleanup_after_task_deletion(task_id: int, task_title: str, file_list: list[s
     # Log what we "cleaned up"
     logger.info(
         f"CLEANUP COMPLETED: Task '{task_title}' (ID: {task_id}) | "
-        f"Removed from cache, deleted {files_deleted} from S3, updated analytics"
+        f"Removed from cache, deleted {files_deleted} files from storage, updated analytics"
     )
 
 

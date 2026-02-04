@@ -9,10 +9,7 @@ from core.tokens import generate_token, verify_token_expiration
 from db_config import get_db
 from dependencies import get_current_user
 from schemas.auth import VerifyEmailRequest
-from schemas.notification import (
-    NotificationPreferenceResponse,
-    NotificationPreferenceUpdate,
-)
+from schemas.notification import NotificationPreferenceResponse, NotificationPreferenceUpdate
 from services.notifications import (
     get_or_create_preferences,
     send_direct_email,
@@ -62,12 +59,14 @@ def subscribe_to_notifications(
     current_user: db_models.User = Depends(get_current_user),
 ):
     """
-    Subscribe user's email to SNS topic.
-    AWS will send a confirmation email.
+    Subscribe user's email to notifications.
+
+    With Resend: No subscription needed - user is automatically ready to receive emails.
+    With AWS SNS: Would send confirmation email (not implemented for simplicity).
     """
     logger.info(f"Subscribing user_id={current_user.id} to notifications")
 
-    # 1. Trigger AWS subscription
+    # Subscribe (with Resend, this is a no-op but kept for API compatibility)
     subscription_arn = subscribe_user_to_notifications(current_user.email)  # type: ignore
 
     if not subscription_arn:
@@ -77,7 +76,7 @@ def subscribe_to_notifications(
         )
 
     return {
-        "message": "Confirmation email sent. Please check your inbox and confrim subscription.",
+        "message": "You are now subscribed to notifications. You will receive emails based on your preferences.",
         "email": current_user.email,
     }
 
@@ -174,7 +173,7 @@ FAROS Task Manager
     <p>Please verify your email address to enable notifications.</p>
     <p>
         <a href="{verification_url}"
-           style="background-color: #10b981; color: white; padding: 12px 24px; 
+           style="background-color: #10b981; color: white; padding: 12px 24px;
                   text-decoration: none; border-radius: 6px; display: inline-block;">
             Verify Email
         </a>

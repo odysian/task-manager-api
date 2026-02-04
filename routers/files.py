@@ -1,18 +1,16 @@
 import logging
 import os
 import uuid
-from io import BytesIO
 from pathlib import Path
 
-from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 import db_models
 from core import exceptions
 from core.rate_limit_config import limiter
-from core.storage import S3_BUCKET_NAME, s3_client
+from core.storage import get_file_path, storage
 from db_config import get_db
 from dependencies import TaskPermission, get_current_user, require_task_access
 from schemas.file import FileUploadResponse, TaskFileInfo
@@ -96,26 +94,24 @@ async def upload_file(
             detail=f"File too large. Max size: {MAX_FILE_SIZE / 1024 / 1024} MB",
         )
 
-    # Generate unique S3 key
+    # Generate unique filename
     unique_id = str(uuid.uuid4())
     stored_filename = f"task_{task_id}_{unique_id}{file_ext}"
 
-    # Upload to S3
+    # Save file using storage abstraction (works with both local and S3)
     try:
-        s3_client.put_object(
-            Bucket=S3_BUCKET_NAME,
-            Key=stored_filename,
-            Body=content,
-            ContentType=file.content_type or "application/octet-stream",
+        storage.upload_file(
+            stored_filename=stored_filename,
+            content=content,
+            content_type=file.content_type or "application/octet-stream",
         )
-    except ClientError as e:
-        logger.error(f"S3 upload failed: {e}")
+        logger.info(f"File saved: {stored_filename} ({file_size} bytes)")
+    except Exception as e:
+        logger.error(f"File upload failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to upload file to storage",
+            detail="Failed to save file to storage",
         ) from e
-
-    logger.info(f"File saved to disk: {stored_filename} ({file_size} bytes)")
 
     # Create database record
     task_file = db_models.TaskFile(
@@ -197,39 +193,45 @@ async def download_file(
     # Verify user has permission to access the parent task
     require_task_access(task_file.task, current_user, db_session, TaskPermission.VIEW)
 
-    # Download file from S3
+    # Download file using storage abstraction
     try:
-        s3_response = s3_client.get_object(
-            Bucket=S3_BUCKET_NAME, Key=task_file.stored_filename
-        )
-        file_content = s3_response["Body"].read()
+        file_content = storage.download_file(task_file.stored_filename)  # type: ignore
 
         logger.info(
             f"File download successful: file_id={file_id}, filename={task_file.original_filename}"
         )
 
-        # Wrap in BytesIO and stream to user
-        file_stream = BytesIO(file_content)
+        # For local storage, use FileResponse for efficiency
+        # For S3, use StreamingResponse with BytesIO
+        from io import BytesIO
 
-        return StreamingResponse(
-            file_stream,
-            media_type=task_file.content_type or "application/octet-stream",  # type: ignore
-            headers={
-                "Content-Disposition": f"attachment; filename='{task_file.original_filename}'"
-            },
-        )
+        from core.storage import LocalStorage
 
-    except ClientError as e:
-        if e.response["Error"]["Code"] == "NoSuchKey":
-            logger.error(
-                f"Download failed: file not found in S3: {task_file.stored_filename}"
+        if isinstance(storage, LocalStorage):
+            file_path = storage.get_file_path(task_file.stored_filename)  # type: ignore
+            return FileResponse(
+                path=str(file_path),
+                media_type=task_file.content_type or "application/octet-stream",  # type: ignore
+                filename=task_file.original_filename,  # type: ignore
             )
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="File not found in storage",
-            ) from e
-
-        logger.error(f"S3 download failed: {e}")
+        else:
+            # S3 storage - stream the bytes
+            file_stream = BytesIO(file_content)
+            return StreamingResponse(
+                file_stream,
+                media_type=task_file.content_type or "application/octet-stream",  # type: ignore
+                headers={
+                    "Content-Disposition": f"attachment; filename='{task_file.original_filename}'"
+                },
+            )
+    except FileNotFoundError:
+        logger.error(f"Download failed: file not found: {task_file.stored_filename}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found in storage",
+        )
+    except Exception as e:
+        logger.error(f"File download failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to download file from storage",
@@ -274,13 +276,13 @@ def delete_file(
     db_session.delete(task_file)
     db_session.commit()
 
-    # Delete from S3
+    # Delete file using storage abstraction
     try:
-        s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=stored_filename)
-        logger.info(f"Deleted file from S3: {stored_filename}")
-    except ClientError as e:
+        storage.delete_file(stored_filename)
+        logger.info(f"Deleted file from storage: {stored_filename}")
+    except Exception as e:
         # Log warning but don't fail - file might already be gone
-        logger.warning(f"S3 deletion warning for {stored_filename}: {e}")
+        logger.warning(f"File deletion warning for {stored_filename}: {e}")
 
     logger.info(
         f"File deleted successfully: file_id={file_id}, filename={original_filename}"
