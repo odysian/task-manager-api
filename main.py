@@ -110,6 +110,7 @@ app.add_middleware(
         "http://localhost:5174",
         "https://faros.odysian.dev",
         "https://d1owe5rp9qba94.cloudfront.net",
+        "https://task-manager-frontend-phi-seven.vercel.app/",
     ],
     allow_credentials=True,
     allow_methods=["*"],
