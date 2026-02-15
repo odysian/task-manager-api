@@ -9,6 +9,5 @@ uploads/
 .env.docker
 .vscode/
 docs/guides
-MODERNIZATION.md
 TESTPLAN.md
 TASKS.md
